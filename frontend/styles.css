@@ -208,7 +208,8 @@ input {
   line-height: 1.45;
 }
 
-.basic-info-section {
+.renovation-section,
+.house-info-section {
   min-height: 100vh;
   scroll-margin-top: 0;
   padding: 92px 24px 110px;
@@ -243,6 +244,123 @@ input {
 
 .questionnaire {
   margin-top: 24px;
+}
+
+.scope-form {
+  margin-top: 28px;
+}
+
+.scope-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.scope-tile {
+  min-width: 0;
+  min-height: 208px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 18px;
+  align-items: center;
+  justify-items: center;
+  border: 0;
+  padding: 28px 20px 24px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.scope-tile img {
+  width: min(92px, 46%);
+  height: 92px;
+  object-fit: contain;
+  transition: transform 180ms ease;
+}
+
+.scope-tile span {
+  max-width: 230px;
+  font-size: clamp(17px, 1.7vw, 24px);
+  font-weight: 760;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.scope-tile:hover,
+.scope-tile:focus-visible {
+  background: var(--panel);
+  outline: none;
+}
+
+.scope-tile:hover img,
+.scope-tile:focus-visible img {
+  transform: translateY(-3px);
+}
+
+.scope-tile.is-selected {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.52);
+}
+
+.scope-tile.is-selected img {
+  transform: translateY(-4px) scale(1.04);
+}
+
+.scope-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 22px;
+}
+
+.scope-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.scope-submit {
+  min-width: 158px;
+  height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 0;
+  padding: 0 22px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 760;
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.scope-submit:hover,
+.scope-submit:focus-visible {
+  background: var(--accent);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.scope-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.34;
+  transform: none;
 }
 
 .building-card {
@@ -465,7 +583,8 @@ input {
     margin-left: 0;
   }
 
-  .basic-info-section {
+  .renovation-section,
+  .house-info-section {
     padding: 72px 16px 82px;
   }
 
@@ -479,6 +598,31 @@ input {
     grid-template-columns: 1fr;
     gap: 16px;
     padding: 24px 0;
+  }
+
+  .scope-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scope-tile {
+    min-height: 148px;
+    grid-template-columns: 86px 1fr;
+    grid-template-rows: 1fr;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .scope-tile img {
+    width: 72px;
+    height: 72px;
+  }
+
+  .scope-actions {
+    display: grid;
+  }
+
+  .scope-submit {
+    width: 100%;
   }
 
   .building-card-header {

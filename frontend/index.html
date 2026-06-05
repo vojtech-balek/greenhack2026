@@ -8,7 +8,7 @@
   </head>
   <body>
     <header class="site-header" aria-label="Hlavní navigace">
-      <a class="brand" href="#" aria-label="renovuj.me domov">renovuj.me</a>
+      <a class="brand" href="#" aria-label="renovuj.me domů">renovuj.me</a>
       <span class="hackathon-label">Renovate Now</span>
     </header>
 
@@ -27,22 +27,44 @@
               autocomplete="street-address"
               placeholder="Zadejte adresu vašeho bytového domu..."
             />
-            <button type="submit" id="addressSubmit" aria-label="Pokračovat na základní informace">
+            <button type="submit" id="addressSubmit" aria-label="Pokračovat na výběr opatření">
               <span data-submit-label>Pokračovat</span>
               <span class="button-arrow" aria-hidden="true">→</span>
             </button>
           </form>
 
           <p class="form-message" id="formMessage" role="status" aria-live="polite"></p>
-          <p class="hero-note">Bez registrace. Nejdřív jen pár odpovědí, ať víme, odkud začít.</p>
+          <p class="hero-note">Bez registrace. Nejdřív vybereme dům, potom opatření, která vás zajímají.</p>
         </div>
       </section>
 
-      <section class="basic-info-section" id="basicInfo" aria-labelledby="basicInfoTitle" tabindex="-1">
+      <section class="renovation-section" id="renovationScope" aria-labelledby="renovationScopeTitle" tabindex="-1">
         <div class="section-shell">
           <div class="section-heading">
-            <p class="eyebrow">Krok 1</p>
-            <h2 id="basicInfoTitle">Základní informace o domě</h2>
+            <p class="eyebrow">Krok 2</p>
+            <h2 id="renovationScopeTitle">Co chcete v domě řešit?</h2>
+          </div>
+
+          <form class="scope-form" id="scopeForm">
+            <div class="scope-grid" id="scopeGrid" aria-label="Výběr renovačních opatření"></div>
+            <div class="scope-actions">
+              <p id="scopeMessage" class="scope-message" role="status" aria-live="polite">
+                Vyberte jednu nebo více oblastí.
+              </p>
+              <button class="scope-submit" id="scopeSubmit" type="submit" disabled>
+                <span>Jdeme dál</span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="house-info-section" id="houseInfo" aria-labelledby="houseInfoTitle" tabindex="-1">
+        <div class="section-shell">
+          <div class="section-heading">
+            <p class="eyebrow">Krok 3</p>
+            <h2 id="houseInfoTitle">Základní informace o domě</h2>
           </div>
 
           <section class="building-card" id="buildingCard" aria-live="polite" hidden>

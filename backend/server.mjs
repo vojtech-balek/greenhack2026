@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = fileURLToPath(new URL("..", import.meta.url));
 const frontendDir = join(rootDir, "frontend");
+const backendImgDir = join(rootDir, "backend", "img");
 const constructionCodelistPath = join(rootDir, "backend", "data", "CE_DRUH_KONSTRUKCE.csv");
 const port = Number.parseInt(process.env.PORT || "3000", 10);
 
@@ -70,6 +71,7 @@ const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
   ".svg": "image/svg+xml",
 };
 
@@ -498,9 +500,24 @@ function resolveStaticPath(urlPath) {
   return resolvedPath;
 }
 
+function resolveImagePath(urlPath) {
+  if (!urlPath.startsWith("/img/")) {
+    return null;
+  }
+
+  const relativePath = urlPath.replace(/^\/img\//, "");
+  const resolvedPath = normalize(join(backendImgDir, relativePath));
+
+  if (!resolvedPath.startsWith(backendImgDir)) {
+    return null;
+  }
+
+  return resolvedPath;
+}
+
 async function serveStatic(request, response) {
   const url = new URL(request.url, `http://${request.headers.host}`);
-  const filePath = resolveStaticPath(url.pathname);
+  const filePath = resolveImagePath(url.pathname) || resolveStaticPath(url.pathname);
 
   if (!filePath) {
     json(response, 403, { error: "Forbidden" });
