@@ -19,13 +19,36 @@ const questions = [
 
 const state = {
   address: "",
+  buildingInfo: null,
   answers: Object.fromEntries(questions.map((question) => [question.id, null])),
 };
 
 const addressForm = document.querySelector("#addressForm");
 const addressInput = document.querySelector("#addressInput");
+const addressSubmit = document.querySelector("#addressSubmit");
+const submitLabel = document.querySelector("[data-submit-label]");
+const formMessage = document.querySelector("#formMessage");
 const basicInfoSection = document.querySelector("#basicInfo");
 const questionList = document.querySelector("#questionList");
+const buildingCard = document.querySelector("#buildingCard");
+const buildingTitle = document.querySelector("#buildingTitle");
+const buildingAddress = document.querySelector("#buildingAddress");
+const buildingCode = document.querySelector("#buildingCode");
+const addressCode = document.querySelector("#addressCode");
+const buildingFacts = document.querySelector("#buildingFacts");
+const confidencePill = document.querySelector("#confidencePill");
+
+function setLoading(isLoading) {
+  addressSubmit.disabled = isLoading;
+  addressInput.disabled = isLoading;
+  submitLabel.textContent = isLoading ? "Načítám" : "Pokračovat";
+  addressForm.classList.toggle("is-loading", isLoading);
+}
+
+function setMessage(message, type = "neutral") {
+  formMessage.textContent = message;
+  formMessage.dataset.type = type;
+}
 
 function scrollToBasicInfo() {
   basicInfoSection.scrollIntoView({
@@ -38,10 +61,113 @@ function scrollToBasicInfo() {
   }, 720);
 }
 
-function handleAddressSubmit(event) {
+function formatValue(value, fallback = "Nezjištěno") {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
+  return value;
+}
+
+function createFact(label, value, suffix = "") {
+  const item = document.createElement("div");
+  item.className = "fact-item";
+
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+
+  const valueElement = document.createElement("strong");
+  const cleanValue = formatValue(value);
+  valueElement.textContent = cleanValue === "Nezjištěno" ? cleanValue : `${cleanValue}${suffix}`;
+
+  item.append(labelElement, valueElement);
+  return item;
+}
+
+function renderBuildingInfo(data) {
+  state.buildingInfo = data;
+  buildingCard.hidden = false;
+
+  const address = data.address;
+  const building = data.building;
+  const titleParts = [address.municipalityName, address.cp ? `č.p. ${address.cp}` : null].filter(Boolean);
+  const addressParts = [
+    address.municipalityPartName,
+    address.zip ? `PSČ ${address.zip}` : null,
+    data.query ? `zadáno: ${data.query}` : null,
+  ].filter(Boolean);
+
+  buildingTitle.textContent = titleParts.join(", ") || "Údaje o domu";
+  buildingAddress.textContent = addressParts.join(" · ");
+  buildingCode.textContent = formatValue(building.stavebniObjektKod);
+  addressCode.textContent = formatValue(address.ruianId);
+  confidencePill.textContent =
+    typeof address.confidence === "number" ? `${Math.round(address.confidence * 100)}% shoda` : "Adresa nalezena";
+
+  const utilities = building.utilities || {};
+
+  buildingFacts.replaceChildren(
+    createFact("Typ objektu", building.buildingType),
+    createFact("Způsob využití", building.usage),
+    createFact("Dokončení stavby", building.completedAt),
+    createFact("Zastavěná plocha", building.builtAreaM2, " m²"),
+    createFact("Podlahová plocha", building.floorAreaM2, " m²"),
+    createFact("Obestavěný prostor", building.enclosedVolumeM3, " m³"),
+    createFact("Konstrukční materiál", building.constructionType),
+    createFact("Počet podlaží", building.floors),
+    createFact("Počet bytů", building.flats),
+    createFact("Vodovod", utilities.water),
+    createFact("Kanalizace", utilities.sewer),
+    createFact("Plyn", utilities.gas),
+    createFact("Výtah", utilities.elevator),
+    createFact("Vytápění", utilities.heating),
+    createFact("Kód konstrukce", building.constructionTypeCode),
+  );
+}
+
+async function fetchBuildingInfo(address) {
+  const response = await fetch("/api/building-info", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ address }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Nepodařilo se načíst údaje o domu.");
+  }
+
+  return data;
+}
+
+async function handleAddressSubmit(event) {
   event.preventDefault();
-  state.address = addressInput.value.trim();
-  scrollToBasicInfo();
+
+  const address = addressInput.value.trim();
+
+  if (!address) {
+    setMessage("Zadejte prosím obec a číslo popisné.", "error");
+    addressInput.focus();
+    return;
+  }
+
+  state.address = address;
+  setLoading(true);
+  setMessage("Hledám adresu a načítám údaje z RÚIAN...", "neutral");
+
+  try {
+    const data = await fetchBuildingInfo(address);
+    renderBuildingInfo(data);
+    setMessage("Dům jsme našli. Pokračujte základními otázkami.", "success");
+    scrollToBasicInfo();
+  } catch (error) {
+    setMessage(error.message, "error");
+  } finally {
+    setLoading(false);
+  }
 }
 
 function createToggle(question, value, label) {
