@@ -99,6 +99,46 @@ const questions = [
   },
 ];
 
+const scopeImpact = {
+  zatepleni: 28000,
+  fotovoltaika: 22000,
+  "zdroj-tepla": 26000,
+  "tepla-voda": 12000,
+  rekuperace: 15000,
+  "destova-voda": 9000,
+  "zelena-strecha": 11000,
+  "odpadni-teplo": 8000,
+  "zranitelne-domacnosti": 18000,
+};
+
+const answerImpact = {
+  envelope: {
+    uninsulated: 32000,
+    partial: 16000,
+    complete: 4000,
+  },
+  roof: {
+    flat_rebuild: 18000,
+    sloped_good: 6000,
+    recently_fixed: 3000,
+  },
+  internal_infrastructure: {
+    old_boiler: 26000,
+    risers_before_rebuild: 18000,
+    modernized: 4000,
+  },
+  surroundings: {
+    yes: 6000,
+    no: 14000,
+    unknown: 10000,
+  },
+  demographics: {
+    yes: 22000,
+    no: 5000,
+    unknown: 12000,
+  },
+};
+
 const state = {
   address: "",
   buildingInfo: null,
@@ -111,6 +151,7 @@ const addressInput = document.querySelector("#addressInput");
 const addressSubmit = document.querySelector("#addressSubmit");
 const submitLabel = document.querySelector("[data-submit-label]");
 const formMessage = document.querySelector("#formMessage");
+const addressResults = document.querySelector("#addressResults");
 const renovationScopeSection = document.querySelector("#renovationScope");
 const houseInfoSection = document.querySelector("#houseInfo");
 const scopeForm = document.querySelector("#scopeForm");
@@ -119,6 +160,13 @@ const scopeSubmit = document.querySelector("#scopeSubmit");
 const scopeMessage = document.querySelector("#scopeMessage");
 const questionList = document.querySelector("#questionList");
 const houseImage = document.querySelector("#houseImage");
+const basicInfoForm = document.querySelector("#basicInfoForm");
+const questionnaireSubmit = document.querySelector("#questionnaireSubmit");
+const questionnaireMessage = document.querySelector("#questionnaireMessage");
+const impactStage = document.querySelector("#impactStage");
+const impactTotal = document.querySelector("#impactTotal");
+const impactSummary = document.querySelector("#impactSummary");
+const impactGrid = document.querySelector("#impactGrid");
 
 function setLoading(isLoading) {
   addressSubmit.disabled = isLoading;
@@ -130,6 +178,11 @@ function setLoading(isLoading) {
 function setMessage(message, type = "neutral") {
   formMessage.textContent = message;
   formMessage.dataset.type = type;
+}
+
+function clearAddressResults() {
+  addressResults.hidden = true;
+  addressResults.replaceChildren();
 }
 
 function scrollToSection(section) {
@@ -167,13 +220,25 @@ function renderBuildingInfo(data) {
   updateHouseImage(data);
 }
 
+async function searchAddressMatches(address) {
+  const response = await fetch(`/api/address-search?q=${encodeURIComponent(address)}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Nepodařilo se vyhledat adresu.");
+  }
+
+  return data;
+}
+
 async function fetchBuildingInfo(address) {
+  const body = typeof address === "string" ? { address } : { selectedAddress: address };
   const response = await fetch("/api/building-info", {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({ address }),
+    body: JSON.stringify(body),
   });
 
   const data = await response.json();
@@ -183,6 +248,68 @@ async function fetchBuildingInfo(address) {
   }
 
   return data;
+}
+
+async function loadBuildingFromSelection(selectedAddress) {
+  state.address = selectedAddress.displayName;
+  setLoading(true);
+  setMessage("Načítám údaje o vybraném domě z RÚIAN...", "neutral");
+  clearAddressResults();
+
+  try {
+    const data = await fetchBuildingInfo(selectedAddress);
+    renderBuildingInfo(data);
+    setMessage("Dům jsme našli. Vyberte, co chcete řešit.", "success");
+    scrollToSection(renovationScopeSection);
+  } catch (error) {
+    setMessage(error.message, "error");
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderAddressMatches(data) {
+  addressResults.replaceChildren();
+
+  if (data.matches.length === 0) {
+    setMessage("Nenašli jsme adresu s číslem domu. Zkuste přidat obec, ulici a PSČ.", "error");
+    addressResults.hidden = true;
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "address-match-list";
+
+  data.matches.forEach((match) => {
+    const button = document.createElement("button");
+    button.className = "address-match";
+    button.type = "button";
+
+    const title = document.createElement("strong");
+    title.textContent = match.displayName;
+
+    const details = document.createElement("span");
+    details.textContent = [
+      match.street,
+      match.cp ? `č.p. ${match.cp}` : null,
+      match.municipalityName,
+      match.zip ? `PSČ ${match.zip}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    button.append(title, details);
+    button.addEventListener("click", () => loadBuildingFromSelection(match));
+    list.append(button);
+  });
+
+  const attribution = document.createElement("p");
+  attribution.className = "address-attribution";
+  attribution.textContent = data.attribution;
+
+  addressResults.append(list, attribution);
+  addressResults.hidden = false;
+  setMessage("Vyberte správnou adresu ze seznamu.", "success");
 }
 
 async function handleAddressSubmit(event) {
@@ -198,13 +325,12 @@ async function handleAddressSubmit(event) {
 
   state.address = address;
   setLoading(true);
-  setMessage("Hledám adresu a načítám údaje z RÚIAN...", "neutral");
+  setMessage("Hledám možné adresy...", "neutral");
+  clearAddressResults();
 
   try {
-    const data = await fetchBuildingInfo(address);
-    renderBuildingInfo(data);
-    setMessage("Dům jsme našli. Vyberte, co chcete řešit.", "success");
-    scrollToSection(renovationScopeSection);
+    const data = await searchAddressMatches(address);
+    renderAddressMatches(data);
   } catch (error) {
     setMessage(error.message, "error");
   } finally {
@@ -219,6 +345,15 @@ function updateScopeState() {
     selectedCount === 0
       ? "Vyberte jednu nebo více oblastí."
       : `Vybráno: ${selectedCount}`;
+}
+
+function updateQuestionnaireState() {
+  const answeredCount = Object.values(state.answers).filter(Boolean).length;
+  questionnaireSubmit.disabled = answeredCount === 0;
+  questionnaireMessage.textContent =
+    answeredCount === 0
+      ? "Odpovězte alespoň na jednu otázku."
+      : `Zodpovězeno: ${answeredCount}`;
 }
 
 function createScopeTile(option) {
@@ -290,6 +425,8 @@ function createToggle(question, option) {
       toggle.classList.toggle("is-selected", isActive);
       toggle.setAttribute("aria-pressed", String(isActive));
     });
+
+    updateQuestionnaireState();
   });
 
   return button;
@@ -328,11 +465,95 @@ function renderQuestions() {
   const visibleQuestions = getVisibleQuestions();
   questionList.replaceChildren();
 
+  state.answers = Object.fromEntries(questions.map((question) => [question.id, null]));
+
   visibleQuestions.forEach((question, index) => {
     questionList.append(createQuestionItem(question, index));
   });
+
+  updateQuestionnaireState();
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("cs-CZ", {
+    style: "currency",
+    currency: "CZK",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function createImpactCard(label, value, detail) {
+  const card = document.createElement("article");
+  card.className = "impact-card";
+
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+
+  const valueElement = document.createElement("strong");
+  valueElement.textContent = formatCurrency(value);
+
+  const detailElement = document.createElement("p");
+  detailElement.textContent = detail;
+
+  card.append(labelElement, valueElement, detailElement);
+  return card;
+}
+
+function calculateImpact() {
+  const selectedScopeCost = [...state.selectedScopes].reduce(
+    (sum, scopeId) => sum + (scopeImpact[scopeId] || 0),
+    0,
+  );
+  const answerCost = Object.entries(state.answers).reduce(
+    (sum, [questionId, value]) => sum + (answerImpact[questionId]?.[value] || 0),
+    0,
+  );
+  const buildingFactor = normalizeUsage(state.buildingInfo?.building?.usage) === "bytový dům" ? 1.35 : 1;
+  const yearlyCost = Math.round((selectedScopeCost + answerCost) * buildingFactor);
+  const threeYearCost = Math.round(yearlyCost * 3.18);
+  const missedSubsidy = Math.round(selectedScopeCost * 1.8);
+
+  return { yearlyCost, threeYearCost, missedSubsidy, selectedScopeCost, answerCost };
+}
+
+function renderImpact() {
+  const impact = calculateImpact();
+  impactTotal.textContent = formatCurrency(impact.threeYearCost);
+  impactSummary.textContent =
+    "Placeholder odhad kombinuje vybraná opatření, odpovědi z dotazníku a typ domu. Slouží jen pro hackathonový prototyp.";
+
+  impactGrid.replaceChildren(
+    createImpactCard(
+      "Roční náklady čekání",
+      impact.yearlyCost,
+      "Hrubý dopad vyšších energií, údržby a horší připravenosti projektu.",
+    ),
+    createImpactCard(
+      "Tříletý odklad",
+      impact.threeYearCost,
+      "Ukazuje, jak se může malý roční dopad nasčítat při čekání.",
+    ),
+    createImpactCard(
+      "Riziko nevyužité podpory",
+      impact.missedSubsidy,
+      "Orientační hodnota příležitosti navázaná na zvolená opatření.",
+    ),
+  );
+}
+
+function handleQuestionnaireSubmit(event) {
+  event.preventDefault();
+
+  if (questionnaireSubmit.disabled) {
+    updateQuestionnaireState();
+    return;
+  }
+
+  renderImpact();
+  scrollToSection(impactStage);
 }
 
 addressForm.addEventListener("submit", handleAddressSubmit);
 scopeForm.addEventListener("submit", handleScopeSubmit);
+basicInfoForm.addEventListener("submit", handleQuestionnaireSubmit);
 renderScopeTiles();

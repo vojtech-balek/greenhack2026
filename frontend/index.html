@@ -34,6 +34,7 @@
           </form>
 
           <p class="form-message" id="formMessage" role="status" aria-live="polite"></p>
+          <div class="address-results" id="addressResults" hidden></div>
           <p class="hero-note">Bez registrace. Nejdřív vybereme dům, potom opatření, která vás zajímají.</p>
         </div>
       </section>
@@ -74,7 +75,34 @@
 
             <form class="questionnaire" id="basicInfoForm" aria-label="Základní informace o domě">
               <div class="question-list" id="questionList"></div>
+              <div class="questionnaire-actions">
+                <p id="questionnaireMessage" class="scope-message" role="status" aria-live="polite">
+                  Odpovězte alespoň na jednu otázku.
+                </p>
+                <button class="scope-submit" id="questionnaireSubmit" type="submit" disabled>
+                  <span>Spočítat dopad</span>
+                  <span aria-hidden="true">→</span>
+                </button>
+              </div>
             </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="impact-section" id="impactStage" aria-labelledby="impactTitle" tabindex="-1">
+        <div class="section-shell">
+          <div class="section-heading">
+            <p class="eyebrow">Krok 4</p>
+            <h2 id="impactTitle">Co může stát odklad renovace?</h2>
+          </div>
+
+          <div class="impact-layout">
+            <article class="impact-lead">
+              <span>Hrubý odhad</span>
+              <strong id="impactTotal">-</strong>
+              <p id="impactSummary">Výpočet se zobrazí po vyplnění základních informací.</p>
+            </article>
+            <div class="impact-grid" id="impactGrid"></div>
           </div>
         </div>
       </section>

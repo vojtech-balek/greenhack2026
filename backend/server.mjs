@@ -231,6 +231,87 @@ function parseAddress(input) {
   return { address, zip, cp, candidates: parsedCandidates };
 }
 
+function normalizeZip(value) {
+  return String(value || "").replace(/\s+/g, "");
+}
+
+function normalizeHouseNumber(value) {
+  const match = String(value || "").match(/\d{1,5}/);
+  return match ? match[0] : "";
+}
+
+function pickMunicipality(address) {
+  return (
+    address.city ||
+    address.town ||
+    address.village ||
+    address.municipality ||
+    address.county ||
+    address.city_district ||
+    ""
+  );
+}
+
+function normalizeNominatimResult(result) {
+  const address = result.address || {};
+  const municipalityName = cleanPart(pickMunicipality(address));
+  const street = cleanPart(address.road || address.pedestrian || address.footway || address.path || "");
+  const cp = normalizeHouseNumber(address.house_number);
+  const zip = normalizeZip(address.postcode);
+
+  if (!municipalityName || !cp) {
+    return null;
+  }
+
+  return {
+    id: String(result.place_id),
+    displayName: result.display_name,
+    municipalityName,
+    street,
+    cp,
+    zip,
+    lat: result.lat,
+    lon: result.lon,
+    osmType: result.osm_type,
+    osmId: result.osm_id,
+  };
+}
+
+async function searchAddresses(query) {
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery.length < 3) {
+    throw new Error("Zadejte alespoň tři znaky adresy.");
+  }
+
+  const searchUrl = new URL("https://nominatim.openstreetmap.org/search");
+  searchUrl.searchParams.set("q", trimmedQuery);
+  searchUrl.searchParams.set("format", "jsonv2");
+  searchUrl.searchParams.set("addressdetails", "1");
+  searchUrl.searchParams.set("countrycodes", "cz");
+  searchUrl.searchParams.set("limit", "5");
+
+  const response = await fetch(searchUrl, {
+    headers: {
+      "accept": "application/json",
+      "user-agent": "renovuj.me hackathon prototype",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Address search failed with ${response.status}`);
+  }
+
+  const results = await response.json();
+  const matches = results.map(normalizeNominatimResult).filter(Boolean);
+
+  return {
+    query: trimmedQuery,
+    matches,
+    attribution: "© OpenStreetMap contributors",
+  };
+}
+
 function parseCsvLine(line) {
   const values = [];
   let current = "";
@@ -432,7 +513,24 @@ async function getBuildingAttributes(buildingId) {
 }
 
 async function getBuildingInfo(addressInput) {
-  const parsedAddress = parseAddress(addressInput);
+  const parsedAddress =
+    typeof addressInput === "string"
+      ? parseAddress(addressInput)
+      : {
+          address: addressInput.displayName || addressInput.address || "",
+          zip: normalizeZip(addressInput.zip),
+          cp: normalizeHouseNumber(addressInput.cp),
+          candidates: uniqueCandidates([
+            {
+              address: addressInput.displayName || addressInput.address || "",
+              municipalityName: cleanPart(addressInput.municipalityName || ""),
+              street: cleanPart(addressInput.street || ""),
+              zip: normalizeZip(addressInput.zip),
+              cp: normalizeHouseNumber(addressInput.cp),
+            },
+          ]),
+        };
+
   const validatedAddress = await getAddressId(parsedAddress);
   const addressId = validatedAddress.place.ruianId;
   const buildingId = await getBuildingId(addressId);
@@ -548,10 +646,21 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (url.pathname === "/api/address-search" && request.method === "GET") {
+    try {
+      const results = await searchAddresses(url.searchParams.get("q") || "");
+      json(response, 200, results);
+    } catch (error) {
+      json(response, 400, { error: error.message || "Nepodařilo se vyhledat adresu." });
+    }
+
+    return;
+  }
+
   if (url.pathname === "/api/building-info" && request.method === "POST") {
     try {
       const body = await readJsonBody(request);
-      const buildingInfo = await getBuildingInfo(body.address || "");
+      const buildingInfo = await getBuildingInfo(body.selectedAddress || body.address || "");
       json(response, 200, buildingInfo);
     } catch (error) {
       json(response, 400, { error: error.message || "Nepodařilo se načíst údaje o domu." });
