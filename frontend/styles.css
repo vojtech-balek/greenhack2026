@@ -246,6 +246,37 @@ input {
   margin-top: 24px;
 }
 
+.questionnaire-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.92fr) minmax(0, 1.08fr);
+  gap: clamp(32px, 6vw, 76px);
+  align-items: start;
+  margin-top: 34px;
+}
+
+.house-visual {
+  min-height: 520px;
+  display: grid;
+  place-items: end center;
+  padding: clamp(18px, 4vw, 44px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(241, 238, 233, 0.78)),
+    repeating-linear-gradient(90deg, transparent 0 44px, rgba(23, 23, 23, 0.035) 44px 45px);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.house-visual img {
+  width: min(100%, 440px);
+  max-height: 440px;
+  object-fit: contain;
+  filter: drop-shadow(0 26px 38px rgba(23, 23, 23, 0.11));
+}
+
+.questionnaire-layout .questionnaire {
+  margin-top: 0;
+}
+
 .scope-form {
   margin-top: 28px;
 }
@@ -481,9 +512,9 @@ input {
 
 .question-item {
   display: grid;
-  grid-template-columns: 72px 1fr auto;
+  grid-template-columns: 72px minmax(0, 1fr);
   gap: 28px;
-  align-items: center;
+  align-items: start;
   padding: 26px 0;
   border-bottom: 1px solid var(--line);
 }
@@ -501,9 +532,11 @@ input {
 }
 
 .toggle-group {
-  min-width: 184px;
+  grid-column: 2;
+  width: 100%;
+  min-width: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 4px;
   padding: 4px;
   background: var(--panel-soft);
@@ -511,12 +544,14 @@ input {
 }
 
 .toggle-option {
-  height: 46px;
+  min-height: 48px;
   border: 0;
+  padding: 10px 12px;
   background: transparent;
   color: var(--muted);
   font-size: 15px;
   font-weight: 720;
+  line-height: 1.15;
   cursor: pointer;
   transition:
     background 180ms ease,
@@ -598,6 +633,23 @@ input {
     grid-template-columns: 1fr;
     gap: 16px;
     padding: 24px 0;
+  }
+
+  .toggle-group {
+    grid-column: 1;
+  }
+
+  .questionnaire-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .house-visual {
+    min-height: 310px;
+  }
+
+  .house-visual img {
+    max-height: 270px;
   }
 
   .scope-grid {

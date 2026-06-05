@@ -48,20 +48,54 @@ const scopeOptions = [
 
 const questions = [
   {
-    id: "windows",
-    text: "Má dům nezateplená okna?",
+    id: "envelope",
+    text: "Jaký je převládající stav fasády a oken?",
+    triggers: ["zatepleni", "zdroj-tepla", "rekuperace"],
+    options: [
+      { value: "uninsulated", label: "Dům je nezateplený" },
+      { value: "partial", label: "Částečně zateplený" },
+      { value: "complete", label: "Kompletně zateplený s novými okny" },
+    ],
   },
   {
-    id: "facade",
-    text: "Chybí domu zateplení obvodových stěn?",
+    id: "roof",
+    text: "Jaký je technický stav a typ vaší střechy?",
+    triggers: ["fotovoltaika", "zelena-strecha", "destova-voda"],
+    options: [
+      { value: "flat_rebuild", label: "Plochá k rekonstrukci" },
+      { value: "sloped_good", label: "Šikmá s dobrou orientací" },
+      { value: "recently_fixed", label: "Nedávno opravená" },
+    ],
   },
   {
-    id: "thermal",
-    text: "Chybí domu jakákoliv tepelně izolační opatření?",
+    id: "internal_infrastructure",
+    text: "V jakém stavu je váš hlavní zdroj tepla a svislé rozvody?",
+    triggers: ["zdroj-tepla", "tepla-voda", "odpadni-teplo"],
+    options: [
+      { value: "old_boiler", label: "Kotel starší 15 let" },
+      { value: "risers_before_rebuild", label: "Rozvody před rekonstrukcí" },
+      { value: "modernized", label: "Vše je modernizované" },
+    ],
   },
   {
-    id: "planning",
-    text: "Řešíte renovaci v příštích 12 měsících?",
+    id: "surroundings",
+    text: "Má dům vlastní pozemek, vnitroblok, nebo snadný přístup k hlavní kanalizaci?",
+    triggers: ["destova-voda", "odpadni-teplo"],
+    options: [
+      { value: "yes", label: "Ano" },
+      { value: "no", label: "Ne" },
+      { value: "unknown", label: "Nevíme" },
+    ],
+  },
+  {
+    id: "demographics",
+    text: "Tvoří významnou část obyvatel domu senioři nebo domácnosti pobírající příspěvky na bydlení?",
+    triggers: ["zranitelne-domacnosti"],
+    options: [
+      { value: "yes", label: "Ano" },
+      { value: "no", label: "Ne" },
+      { value: "unknown", label: "Nevíme" },
+    ],
   },
 ];
 
@@ -84,13 +118,7 @@ const scopeGrid = document.querySelector("#scopeGrid");
 const scopeSubmit = document.querySelector("#scopeSubmit");
 const scopeMessage = document.querySelector("#scopeMessage");
 const questionList = document.querySelector("#questionList");
-const buildingCard = document.querySelector("#buildingCard");
-const buildingTitle = document.querySelector("#buildingTitle");
-const buildingAddress = document.querySelector("#buildingAddress");
-const buildingCode = document.querySelector("#buildingCode");
-const addressCode = document.querySelector("#addressCode");
-const buildingFacts = document.querySelector("#buildingFacts");
-const confidencePill = document.querySelector("#confidencePill");
+const houseImage = document.querySelector("#houseImage");
 
 function setLoading(isLoading) {
   addressSubmit.disabled = isLoading;
@@ -115,68 +143,28 @@ function scrollToSection(section) {
   }, 720);
 }
 
-function formatValue(value, fallback = "Nezjištěno") {
-  if (value === null || value === undefined || value === "") {
-    return fallback;
-  }
-
-  return value;
+function normalizeUsage(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("cs-CZ");
 }
 
-function createFact(label, value, suffix = "") {
-  const item = document.createElement("div");
-  item.className = "fact-item";
+function updateHouseImage(buildingInfo) {
+  const usage = normalizeUsage(buildingInfo?.building?.usage);
+  const isApartmentBuilding = usage === "bytový dům";
+  const isFamilyHouse = usage === "rodinný dům";
 
-  const labelElement = document.createElement("span");
-  labelElement.textContent = label;
-
-  const valueElement = document.createElement("strong");
-  const cleanValue = formatValue(value);
-  valueElement.textContent = cleanValue === "Nezjištěno" ? cleanValue : `${cleanValue}${suffix}`;
-
-  item.append(labelElement, valueElement);
-  return item;
+  houseImage.src = isApartmentBuilding ? "/img/houses/panelak.png" : "/img/houses/basic_house.png";
+  houseImage.alt = isApartmentBuilding
+    ? "Ilustrace bytového domu"
+    : isFamilyHouse
+      ? "Ilustrace rodinného domu"
+      : "Ilustrace domu";
 }
 
 function renderBuildingInfo(data) {
   state.buildingInfo = data;
-  buildingCard.hidden = false;
-
-  const address = data.address;
-  const building = data.building;
-  const titleParts = [address.municipalityName, address.cp ? `č.p. ${address.cp}` : null].filter(Boolean);
-  const addressParts = [
-    address.municipalityPartName,
-    address.zip ? `PSČ ${address.zip}` : null,
-    data.query ? `zadáno: ${data.query}` : null,
-  ].filter(Boolean);
-
-  buildingTitle.textContent = titleParts.join(", ") || "Údaje o domu";
-  buildingAddress.textContent = addressParts.join(" · ");
-  buildingCode.textContent = formatValue(building.stavebniObjektKod);
-  addressCode.textContent = formatValue(address.ruianId);
-  confidencePill.textContent =
-    typeof address.confidence === "number" ? `${Math.round(address.confidence * 100)}% shoda` : "Adresa nalezena";
-
-  const utilities = building.utilities || {};
-
-  buildingFacts.replaceChildren(
-    createFact("Typ objektu", building.buildingType),
-    createFact("Způsob využití", building.usage),
-    createFact("Dokončení stavby", building.completedAt),
-    createFact("Zastavěná plocha", building.builtAreaM2, " m²"),
-    createFact("Podlahová plocha", building.floorAreaM2, " m²"),
-    createFact("Obestavěný prostor", building.enclosedVolumeM3, " m³"),
-    createFact("Konstrukční materiál", building.constructionType),
-    createFact("Počet podlaží", building.floors),
-    createFact("Počet bytů", building.flats),
-    createFact("Vodovod", utilities.water),
-    createFact("Kanalizace", utilities.sewer),
-    createFact("Plyn", utilities.gas),
-    createFact("Výtah", utilities.elevator),
-    createFact("Vytápění", utilities.heating),
-    createFact("Kód konstrukce", building.constructionTypeCode),
-  );
+  updateHouseImage(data);
 }
 
 async function fetchBuildingInfo(address) {
@@ -281,25 +269,26 @@ function handleScopeSubmit(event) {
     return;
   }
 
+  renderQuestions();
   scrollToSection(houseInfoSection);
 }
 
-function createToggle(question, value, label) {
+function createToggle(question, option) {
   const button = document.createElement("button");
   button.className = "toggle-option";
   button.type = "button";
-  button.textContent = label;
-  button.dataset.value = value;
+  button.textContent = option.label;
+  button.dataset.value = option.value;
   button.setAttribute("aria-pressed", "false");
 
   button.addEventListener("click", () => {
-    state.answers[question.id] = value;
+    state.answers[question.id] = option.value;
 
     const group = button.closest(".toggle-group");
-    group.querySelectorAll(".toggle-option").forEach((option) => {
-      const isActive = option.dataset.value === value;
-      option.classList.toggle("is-selected", isActive);
-      option.setAttribute("aria-pressed", String(isActive));
+    group.querySelectorAll(".toggle-option").forEach((toggle) => {
+      const isActive = toggle.dataset.value === option.value;
+      toggle.classList.toggle("is-selected", isActive);
+      toggle.setAttribute("aria-pressed", String(isActive));
     });
   });
 
@@ -320,15 +309,26 @@ function createQuestionItem(question, index) {
   const toggleGroup = document.createElement("div");
   toggleGroup.className = "toggle-group";
   toggleGroup.setAttribute("aria-label", question.text);
-  toggleGroup.append(createToggle(question, "yes", "Ano"));
-  toggleGroup.append(createToggle(question, "no", "Ne"));
+  toggleGroup.dataset.options = String(question.options.length);
+  question.options.forEach((option) => {
+    toggleGroup.append(createToggle(question, option));
+  });
 
   item.append(number, text, toggleGroup);
   return item;
 }
 
+function getVisibleQuestions() {
+  return questions.filter((question) =>
+    question.triggers.some((trigger) => state.selectedScopes.has(trigger)),
+  );
+}
+
 function renderQuestions() {
-  questions.forEach((question, index) => {
+  const visibleQuestions = getVisibleQuestions();
+  questionList.replaceChildren();
+
+  visibleQuestions.forEach((question, index) => {
     questionList.append(createQuestionItem(question, index));
   });
 }
@@ -336,4 +336,3 @@ function renderQuestions() {
 addressForm.addEventListener("submit", handleAddressSubmit);
 scopeForm.addEventListener("submit", handleScopeSubmit);
 renderScopeTiles();
-renderQuestions();
