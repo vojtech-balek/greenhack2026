@@ -2,3 +2,5 @@
 .env
 .env.*
 !.env.example
+backend/data/reconstructions/geocode-cache.json
+backend/data/reconstructions/llm-address-cache.json

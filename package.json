@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "node --watch backend/server.mjs",
     "start": "node backend/server.mjs",
+    "preprocess:reconstructions": "node scripts/preprocess-reconstructions.mjs",
+    "preprocess:reconstructions:geocode": "node scripts/preprocess-reconstructions.mjs --geocode",
+    "preprocess:svj-addresses": "node scripts/standardize-svj-addresses.mjs",
+    "preprocess:svj-addresses:geocode": "node scripts/standardize-svj-addresses.mjs --geocode",
     "check": "node --check backend/server.mjs && node --check frontend/app.js"
   }
 }

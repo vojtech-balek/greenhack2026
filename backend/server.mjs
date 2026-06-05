@@ -7,6 +7,8 @@ const rootDir = fileURLToPath(new URL("..", import.meta.url));
 const frontendDir = join(rootDir, "frontend");
 const backendImgDir = join(rootDir, "backend", "img");
 const constructionCodelistPath = join(rootDir, "backend", "data", "CE_DRUH_KONSTRUKCE.csv");
+const reconstructionCsvPath = join(rootDir, "backend", "data", "reconstructions", "sfzp_aktivni_IS.csv");
+const reconstructionPreparedPath = join(rootDir, "backend", "data", "reconstructions", "sfzp_hoa_geocoded.json");
 const port = Number.parseInt(process.env.PORT || "3000", 10);
 
 async function loadDotEnv(filePath) {
@@ -96,6 +98,14 @@ async function readJsonBody(request) {
 
 function cleanPart(value) {
   return value.replace(/^[,;\s]+|[,;\s]+$/g, "").trim();
+}
+
+function normalizeText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("cs-CZ")
+    .trim();
 }
 
 function uniqueCandidates(candidates) {
@@ -336,6 +346,224 @@ function parseCsvLine(line) {
   return values;
 }
 
+function parseDelimitedLine(line, delimiter = ",") {
+  const values = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    const nextCharacter = line[index + 1];
+
+    if (character === '"' && nextCharacter === '"') {
+      current += '"';
+      index += 1;
+      continue;
+    }
+
+    if (character === '"') {
+      quoted = !quoted;
+      continue;
+    }
+
+    if (character === delimiter && !quoted) {
+      values.push(current.trim().replace(/^\uFEFF/u, ""));
+      current = "";
+      continue;
+    }
+
+    current += character;
+  }
+
+  values.push(current.trim().replace(/^\uFEFF/u, ""));
+  return values;
+}
+
+function parseNumber(value) {
+  const number = Number.parseFloat(String(value || "").replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(number) ? number : 0;
+}
+
+function toFiniteNumber(value) {
+  const number = Number.parseFloat(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function haversineKm(leftLat, leftLon, rightLat, rightLon) {
+  const earthRadiusKm = 6371;
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const deltaLat = toRadians(rightLat - leftLat);
+  const deltaLon = toRadians(rightLon - leftLon);
+  const lat1 = toRadians(leftLat);
+  const lat2 = toRadians(rightLat);
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatApplicantAddress(applicant) {
+  return String(applicant || "")
+    .replace(/^společenství vlastníků(?:\s+jednotek|\s+bytových jednotek)?(?:\s+pro\s+dům|\s+domu|\s+v\s+domě)?/iu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+let reconstructionExamplesPromise;
+
+async function loadPreparedReconstructionExamples() {
+  try {
+    const prepared = JSON.parse(await readFile(reconstructionPreparedPath, "utf8"));
+    return Array.isArray(prepared.records) ? prepared.records : [];
+  } catch {
+    return [];
+  }
+}
+
+function calculateReconstructionStats(examples) {
+  const currentYear = new Date().getFullYear().toString();
+  const byYear = new Map();
+  let totalPaid = 0;
+
+  for (const example of examples) {
+    const year = String(example.signedAt || "").slice(0, 4);
+    const paid = Number(example.paid) || 0;
+
+    if (!year) {
+      continue;
+    }
+
+    const yearStats = byYear.get(year) || { year, applicants: 0, paid: 0 };
+    yearStats.applicants += 1;
+    yearStats.paid += paid;
+    byYear.set(year, yearStats);
+    totalPaid += paid;
+  }
+
+  const yearly = [...byYear.values()].sort((left, right) => left.year.localeCompare(right.year));
+  const latestYear = yearly.at(-1)?.year || currentYear;
+
+  return {
+    currentYear,
+    thisYear: byYear.get(currentYear) || { year: currentYear, applicants: 0, paid: 0 },
+    latestYear: byYear.get(latestYear) || { year: latestYear, applicants: 0, paid: 0 },
+    totalApplicants: examples.length,
+    totalPaid,
+  };
+}
+
+function addExampleToMunicipalityMap(map, example) {
+  const key = normalizeText(example.municipalityName);
+
+  if (!key) {
+    return;
+  }
+
+  if (!map.has(key)) {
+    map.set(key, []);
+  }
+
+  map.get(key).push(example);
+}
+
+function pickRandomExamples(examples, limit) {
+  return [...examples]
+    .map((example) => ({ example, sort: Math.random() }))
+    .sort((left, right) => left.sort - right.sort)
+    .slice(0, limit)
+    .map((entry) => entry.example);
+}
+
+async function loadReconstructionExamples() {
+  const preparedExamples = await loadPreparedReconstructionExamples();
+  const csv = await readFile(reconstructionCsvPath, "utf8");
+  const lines = csv.split(/\r?\n/).filter(Boolean);
+  const headers = parseDelimitedLine(lines.shift());
+  const applicantIndex = headers.indexOf("Žadatel");
+  const municipalityIndex = headers.indexOf("Obec");
+  const supportIndex = headers.indexOf("Podpora");
+  const paidIndex = headers.indexOf("Vyplaceno");
+  const purposeIndex = headers.indexOf("Účel (Výzva – Číslo žádosti)");
+  const dateIndex = headers.indexOf("Datum podpisu rozhodnutí");
+  const byMunicipality = new Map();
+  const allExamples = [];
+  const preparedByMunicipality = new Map();
+
+  for (const example of preparedExamples) {
+    addExampleToMunicipalityMap(preparedByMunicipality, example);
+  }
+
+  for (const line of lines) {
+    const columns = parseDelimitedLine(line);
+    const applicant = columns[applicantIndex] || "";
+
+    if (!normalizeText(applicant).includes("spolecenstvi vlastniku")) {
+      continue;
+    }
+
+    const municipalityName = cleanPart(columns[municipalityIndex] || "");
+
+    if (!municipalityName) {
+      continue;
+    }
+
+    const example = {
+      applicant,
+      applicantAddress: formatApplicantAddress(applicant),
+      municipalityName,
+      support: parseNumber(columns[supportIndex]),
+      paid: parseNumber(columns[paidIndex]),
+      purpose: columns[purposeIndex] || "",
+      signedAt: columns[dateIndex] || "",
+    };
+    const key = normalizeText(municipalityName);
+
+    addExampleToMunicipalityMap(byMunicipality, example);
+    allExamples.push(example);
+  }
+
+  for (const examples of byMunicipality.values()) {
+    examples.sort((left, right) => right.support - left.support);
+  }
+
+  allExamples.sort((left, right) => right.support - left.support);
+
+  const statsSource = preparedExamples.length > 0 ? preparedExamples : allExamples;
+
+  return {
+    byMunicipality,
+    preparedByMunicipality,
+    allExamples,
+    preparedExamples: preparedExamples.sort((left, right) => (right.support || 0) - (left.support || 0)),
+    stats: calculateReconstructionStats(statsSource),
+  };
+}
+
+function getReconstructionExamplesStore() {
+  reconstructionExamplesPromise ??= loadReconstructionExamples();
+  return reconstructionExamplesPromise;
+}
+
+async function getReconstructionExamples({ municipalityName, limit = 4 }) {
+  const store = await getReconstructionExamplesStore();
+  const key = normalizeText(municipalityName);
+  const localPreparedExamples = store.preparedByMunicipality.get(key) || [];
+  const localFallbackExamples = store.byMunicipality.get(key) || [];
+  const localExamples = localPreparedExamples.length > 0 ? localPreparedExamples : localFallbackExamples;
+  const fallbackPool = store.preparedExamples.length > 0 ? store.preparedExamples : store.allExamples;
+  const selected = pickRandomExamples(localExamples.length > 0 ? localExamples : fallbackPool, limit);
+
+  return {
+    municipalityName,
+    mode: localExamples.length > 0 ? "same-city" : "fallback",
+    localCount: localExamples.length,
+    totalCount: fallbackPool.length,
+    stats: store.stats,
+    examples: selected,
+  };
+}
+
 async function loadConstructionTypes() {
   const csvBuffer = await readFile(constructionCodelistPath);
   const csv = new TextDecoder("windows-1250").decode(csvBuffer);
@@ -513,6 +741,8 @@ async function getBuildingAttributes(buildingId) {
 }
 
 async function getBuildingInfo(addressInput) {
+  const selectedLat = typeof addressInput === "object" && addressInput !== null ? toFiniteNumber(addressInput.lat) : null;
+  const selectedLon = typeof addressInput === "object" && addressInput !== null ? toFiniteNumber(addressInput.lon) : null;
   const parsedAddress =
     typeof addressInput === "string"
       ? parseAddress(addressInput)
@@ -554,6 +784,8 @@ async function getBuildingInfo(addressInput) {
       zip: validatedAddress.place.zip,
       cp: validatedAddress.place.cp,
       ruianId: addressId,
+      lat: selectedLat,
+      lon: selectedLon,
     },
     building: {
       stavebniObjektKod: attributes.kod,
@@ -652,6 +884,19 @@ const server = createServer(async (request, response) => {
       json(response, 200, results);
     } catch (error) {
       json(response, 400, { error: error.message || "Nepodařilo se vyhledat adresu." });
+    }
+
+    return;
+  }
+
+  if (url.pathname === "/api/reconstruction-examples" && request.method === "GET") {
+    try {
+      const examples = await getReconstructionExamples({
+        municipalityName: url.searchParams.get("municipalityName") || "",
+      });
+      json(response, 200, examples);
+    } catch (error) {
+      json(response, 400, { error: error.message || "Nepodařilo se načíst příklady rekonstrukcí." });
     }
 
     return;

@@ -167,6 +167,12 @@ const impactStage = document.querySelector("#impactStage");
 const impactTotal = document.querySelector("#impactTotal");
 const impactSummary = document.querySelector("#impactSummary");
 const impactGrid = document.querySelector("#impactGrid");
+const impactNext = document.querySelector("#impactNext");
+const communityStage = document.querySelector("#communityStage");
+const communityCount = document.querySelector("#communityCount");
+const communitySummary = document.querySelector("#communitySummary");
+const communityStats = document.querySelector("#communityStats");
+const communityGrid = document.querySelector("#communityGrid");
 
 function setLoading(isLoading) {
   addressSubmit.disabled = isLoading;
@@ -499,6 +505,101 @@ function createImpactCard(label, value, detail) {
   return card;
 }
 
+function createCommunityCard(example) {
+  const card = document.createElement("article");
+  card.className = "community-card";
+
+  const municipality = document.createElement("span");
+  municipality.textContent = example.municipalityName;
+
+  const title = document.createElement("strong");
+  title.textContent = example.applicantAddress || example.applicant;
+
+  const amount = document.createElement("p");
+  amount.textContent = `Podpora ${formatCurrency(example.support)}`;
+
+  const meta = document.createElement("small");
+  meta.textContent = [example.signedAt, example.purpose].filter(Boolean).join(" · ");
+
+  card.append(municipality, title, amount, meta);
+  return card;
+}
+
+function createCommunityStat(label, value, detail) {
+  const card = document.createElement("article");
+  card.className = "community-stat";
+
+  const valueElement = document.createElement("strong");
+  valueElement.textContent = value;
+
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+
+  const detailElement = document.createElement("small");
+  detailElement.textContent = detail;
+
+  card.append(valueElement, labelElement, detailElement);
+  return card;
+}
+
+async function fetchCommunityExamples() {
+  const municipalityName = state.buildingInfo?.address?.municipalityName || "";
+  const params = new URLSearchParams({ municipalityName });
+
+  const response = await fetch(`/api/reconstruction-examples?${params.toString()}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Nepodařilo se načíst příklady rekonstrukcí.");
+  }
+
+  return data;
+}
+
+function renderCommunityStats(stats) {
+  if (!stats) {
+    communityStats.replaceChildren();
+    return;
+  }
+
+  const yearStats =
+    stats.thisYear?.applicants > 0 || !stats.latestYear ? stats.thisYear : stats.latestYear;
+  const yearLabel = yearStats.year === stats.currentYear ? "letos" : `v roce ${yearStats.year}`;
+
+  communityStats.replaceChildren(
+    createCommunityStat(
+      `${yearLabel} podaných SVJ žádostí`,
+      new Intl.NumberFormat("cs-CZ").format(yearStats.applicants || 0),
+      "Aktivní záznamy programu SFŽP",
+    ),
+    createCommunityStat(
+      `${yearLabel} vyplaceno`,
+      formatCurrency(yearStats.paid || 0),
+      "Součet vyplacené podpory pro SVJ",
+    ),
+    createCommunityStat(
+      "celkem vyplaceno SVJ",
+      formatCurrency(stats.totalPaid || 0),
+      `${new Intl.NumberFormat("cs-CZ").format(stats.totalApplicants || 0)} úspěšných SVJ záznamů`,
+    ),
+  );
+}
+
+function renderCommunityExamples(data) {
+  const localText =
+    data.mode === "same-city"
+      ? `${data.localCount} úspěšných SVJ ve stejné obci`
+      : data.localCount > 0
+        ? `${data.localCount} příkladů ve stejné obci`
+        : "Příklady z aktivních projektů SFŽP";
+
+  communityCount.textContent = localText;
+  communitySummary.textContent =
+    "We know it can be intimidating to take the first step alone - but you aren't. There are many success stories of people just like you.";
+  renderCommunityStats(data.stats);
+  communityGrid.replaceChildren(...data.examples.map(createCommunityCard));
+}
+
 function calculateImpact() {
   const selectedScopeCost = [...state.selectedScopes].reduce(
     (sum, scopeId) => sum + (scopeImpact[scopeId] || 0),
@@ -550,10 +651,19 @@ function handleQuestionnaireSubmit(event) {
   }
 
   renderImpact();
+  fetchCommunityExamples()
+    .then(renderCommunityExamples)
+    .catch((error) => {
+      communityCount.textContent = "Příklady se nepodařilo načíst";
+      communitySummary.textContent = error.message;
+      communityStats.replaceChildren();
+      communityGrid.replaceChildren();
+    });
   scrollToSection(impactStage);
 }
 
 addressForm.addEventListener("submit", handleAddressSubmit);
 scopeForm.addEventListener("submit", handleScopeSubmit);
 basicInfoForm.addEventListener("submit", handleQuestionnaireSubmit);
+impactNext.addEventListener("click", () => scrollToSection(communityStage));
 renderScopeTiles();

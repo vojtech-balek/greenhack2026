@@ -263,7 +263,8 @@ input {
 
 .renovation-section,
 .house-info-section,
-.impact-section {
+.impact-section,
+.community-section {
   min-height: 100vh;
   scroll-margin-top: 0;
   padding: 92px 24px 110px;
@@ -502,6 +503,14 @@ input {
   border: 1px solid var(--line);
 }
 
+.impact-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 22px;
+}
+
 .impact-card {
   min-height: 138px;
   display: flex;
@@ -527,6 +536,121 @@ input {
   color: #706d69;
   font-size: 14px;
   line-height: 1.45;
+}
+
+.community-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.68fr) minmax(0, 1.32fr);
+  gap: clamp(28px, 5vw, 68px);
+  margin-top: 28px;
+  align-items: start;
+}
+
+.community-lead {
+  padding-top: 4px;
+}
+
+.community-lead span {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.community-lead strong {
+  max-width: 420px;
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(34px, 4.2vw, 58px);
+  line-height: 0.98;
+}
+
+.community-lead p {
+  max-width: 430px;
+  margin: 16px 0 0;
+  color: #706d69;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.community-stats {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.community-stat {
+  display: grid;
+  gap: 5px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.community-stat strong {
+  max-width: none;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(24px, 2.5vw, 36px);
+  line-height: 0.95;
+}
+
+.community-stat span {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.2;
+  text-transform: lowercase;
+}
+
+.community-stat small {
+  color: #706d69;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.community-grid {
+  display: grid;
+  gap: 0;
+}
+
+.community-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.community-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 22px;
+  align-items: start;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.community-card span,
+.community-card small {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.community-card strong {
+  grid-column: 1;
+  margin: 0;
+  font-size: clamp(19px, 1.8vw, 27px);
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.community-card p {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(16px, 1.6vw, 22px);
+  font-weight: 760;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .building-card {
@@ -759,7 +883,8 @@ input {
 
   .renovation-section,
   .house-info-section,
-  .impact-section {
+  .impact-section,
+  .community-section {
     padding: 72px 16px 82px;
   }
 
@@ -806,6 +931,36 @@ input {
 
   .impact-lead {
     min-height: 310px;
+  }
+
+  .impact-actions {
+    display: grid;
+  }
+
+  .impact-actions .scope-submit {
+    width: 100%;
+  }
+
+  .community-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .community-lead {
+    min-height: 0;
+  }
+
+  .community-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .community-card {
+    grid-template-columns: 1fr;
+  }
+
+  .community-card p {
+    grid-column: 1;
+    grid-row: auto;
+    white-space: normal;
   }
 
   .scope-grid {
