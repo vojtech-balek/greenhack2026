@@ -1,0 +1,11 @@
+{
+  "name": "renovuj-me",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch backend/server.mjs",
+    "start": "node backend/server.mjs",
+    "check": "node --check backend/server.mjs && node --check frontend/app.js"
+  }
+}

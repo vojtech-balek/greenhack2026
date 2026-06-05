@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>renovuj.me | Renovate Now</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header" aria-label="Hlavni navigace">
+      <a class="brand" href="#" aria-label="renovuj.me domov">renovuj.me</a>
+      <span class="hackathon-label">Renovate Now</span>
+    </header>
+
+    <main>
+      <section class="hero-section" id="hero" aria-labelledby="heroTitle">
+        <div class="hero-inner">
+          <p class="eyebrow">Rychly start renovace</p>
+          <h1 id="heroTitle">Pojďme na to, začněme s renovací.</h1>
+
+          <form class="address-form" id="addressForm">
+            <label class="visually-hidden" for="addressInput">Adresa bytoveho domu</label>
+            <input
+              id="addressInput"
+              name="address"
+              type="text"
+              autocomplete="street-address"
+              placeholder="Zadejte adresu vašeho bytového domu..."
+            />
+            <button type="submit" aria-label="Pokračovat na základní informace">
+              <span>Pokračovat</span>
+              <span class="button-arrow" aria-hidden="true">→</span>
+            </button>
+          </form>
+
+          <p class="hero-note">Bez registrace. Nejdriv jen par odpovedi, at vime, odkud zacit.</p>
+        </div>
+      </section>
+
+      <section class="basic-info-section" id="basicInfo" aria-labelledby="basicInfoTitle" tabindex="-1">
+        <div class="section-shell">
+          <div class="section-heading">
+            <p class="eyebrow">Krok 1</p>
+            <h2 id="basicInfoTitle">Základní informace o domě</h2>
+          </div>
+
+          <form class="questionnaire" id="basicInfoForm" aria-label="Základní informace o domě">
+            <div class="question-list" id="questionList"></div>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
