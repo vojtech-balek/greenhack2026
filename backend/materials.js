@@ -513,7 +513,17 @@ async function htmlToPdfWithBrowser(html) {
 async function htmlToPdfWithPuppeteer(html) {
   let browser;
   try {
-    const puppeteer = (await import("puppeteer")).default;
+    let puppeteer;
+    try {
+      puppeteer = (await import("puppeteer")).default;
+    } catch (importError) {
+      console.error("Puppeteer import failed:", importError.message);
+      throw new Error(
+        "PDF generation requires Puppeteer on Linux/Render. " +
+        "Ensure 'npm install' was run and puppeteer package is installed. " +
+        "Or set PDF_BROWSER_PATH on Windows to use Edge/Chrome.",
+      );
+    }
     browser = await puppeteer.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
