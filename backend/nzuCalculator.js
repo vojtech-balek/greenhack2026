@@ -1,12 +1,19 @@
 export const ENERGY_COST_BASELINE = 450;
 export const CAPEX_INFLATION_RATE = 0.05;
 export const ENERGY_INFLATION_RATE = 0.04;
-export const STATE_LOAN_TERM_YEARS = 25;
 export const COMMERCIAL_INTEREST_RATE = 0.06;
+export const PARTIAL_RENOVATION_LOAN_LIMIT_PER_FLAT = 250000;
+export const COMPLEX_RENOVATION_LOAN_LIMIT_PER_FLAT = 750000;
+export const VULNERABLE_HOUSEHOLD_BONUS_PER_M2 = 2000;
+export const VULNERABLE_HOUSEHOLD_BONUS_MAX_M2_PER_FLAT = 60;
+export const SHORT_STATE_LOAN_TERM_YEARS = 10;
+export const LONG_STATE_LOAN_TERM_YEARS = 15;
+export const LONG_STATE_LOAN_THRESHOLD = 1500000;
 
 const MAX_TOTAL_SAVINGS_RATE = 0.85;
 const WAIT_YEARS = 5;
 const MONTHS_PER_YEAR = 12;
+const COMMERCIAL_LOAN_TERM_YEARS = 25;
 
 const RENOVATION_GOALS = {
   INSULATION: {
@@ -55,6 +62,10 @@ function validateInputs(input) {
     throw new TypeError("selectedGoals must be an array.");
   }
 
+  if (input.renovationType && !["PARTIAL", "COMPLEX"].includes(input.renovationType)) {
+    throw new RangeError("renovationType must be PARTIAL or COMPLEX.");
+  }
+
   input.selectedGoals.forEach((goal) => {
     if (!RENOVATION_GOALS[goal]) {
       throw new RangeError(`Unknown renovation goal: ${goal}`);
@@ -68,12 +79,35 @@ function calculateTotalCommercialInterest(principal) {
   }
 
   const monthlyInterestRate = COMMERCIAL_INTEREST_RATE / MONTHS_PER_YEAR;
-  const numberOfPayments = STATE_LOAN_TERM_YEARS * MONTHS_PER_YEAR;
+  const numberOfPayments = COMMERCIAL_LOAN_TERM_YEARS * MONTHS_PER_YEAR;
   const compoundFactor = (1 + monthlyInterestRate) ** numberOfPayments;
   const monthlyPayment =
     principal * ((monthlyInterestRate * compoundFactor) / (compoundFactor - 1));
 
   return monthlyPayment * numberOfPayments - principal;
+}
+
+function getRenovationType(input) {
+  if (input.renovationType) {
+    return input.renovationType;
+  }
+
+  return input.selectedGoals.includes("INSULATION") ? "COMPLEX" : "PARTIAL";
+}
+
+function getStateLoanTermYears(loanAmount) {
+  return loanAmount <= LONG_STATE_LOAN_THRESHOLD ? SHORT_STATE_LOAN_TERM_YEARS : LONG_STATE_LOAN_TERM_YEARS;
+}
+
+function calculateVulnerableBonus(input, renovationType) {
+  if (renovationType !== "COMPLEX" || input.vulnerableFlats === 0) {
+    return 0;
+  }
+
+  const averageFlatArea = input.floorArea / input.numberOfFlats;
+  const supportedAreaPerFlat = Math.min(averageFlatArea, VULNERABLE_HOUSEHOLD_BONUS_MAX_M2_PER_FLAT);
+
+  return supportedAreaPerFlat * VULNERABLE_HOUSEHOLD_BONUS_PER_M2 * input.vulnerableFlats;
 }
 
 export function calculateNzuRenovation(input) {
@@ -82,11 +116,14 @@ export function calculateNzuRenovation(input) {
   const selectedGoalConfigs = input.selectedGoals.map((goal) => RENOVATION_GOALS[goal]);
 
   const grossCapEx = selectedGoalConfigs.reduce((sum, goal) => sum + goal.cost(input), 0);
-
-  const vulnerableRatio = input.vulnerableFlats / input.numberOfFlats;
-  const directSubsidyVulnerable = grossCapEx * vulnerableRatio;
-  const netStateLoanAmount = grossCapEx - directSubsidyVulnerable;
-  const monthlyStateLoanPayment = netStateLoanAmount / (STATE_LOAN_TERM_YEARS * MONTHS_PER_YEAR);
+  const renovationType = getRenovationType(input);
+  const loanLimitPerFlat =
+    renovationType === "COMPLEX" ? COMPLEX_RENOVATION_LOAN_LIMIT_PER_FLAT : PARTIAL_RENOVATION_LOAN_LIMIT_PER_FLAT;
+  const maxStateLoanAmount = loanLimitPerFlat * input.numberOfFlats;
+  const directSubsidyVulnerable = calculateVulnerableBonus(input, renovationType);
+  const netStateLoanAmount = Math.min(Math.max(grossCapEx - directSubsidyVulnerable, 0), maxStateLoanAmount);
+  const stateLoanTermYears = getStateLoanTermYears(netStateLoanAmount);
+  const monthlyStateLoanPayment = netStateLoanAmount / (stateLoanTermYears * MONTHS_PER_YEAR);
 
   const currentAnnualEnergyCost = input.floorArea * ENERGY_COST_BASELINE;
   const totalSavingsRate = Math.min(
@@ -108,6 +145,8 @@ export function calculateNzuRenovation(input) {
     grossCapEx: Math.round(grossCapEx),
     directSubsidyVulnerable: Math.round(directSubsidyVulnerable),
     netStateLoanAmount: Math.round(netStateLoanAmount),
+    maxStateLoanAmount: Math.round(maxStateLoanAmount),
+    stateLoanTermYears: Math.round(stateLoanTermYears),
     monthlyStateLoanPayment: Math.round(monthlyStateLoanPayment),
     estimatedYearlySavings: Math.round(estimatedYearlySavings),
     penaltyLostSavings: Math.round(penaltyLostSavings),

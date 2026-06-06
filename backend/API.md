@@ -154,9 +154,11 @@ Returns:
 ```json
 {
   "grossCapEx": 5800000,
-  "directSubsidyVulnerable": 1160000,
-  "netStateLoanAmount": 4640000,
-  "monthlyStateLoanPayment": 15467,
+  "directSubsidyVulnerable": 240000,
+  "netStateLoanAmount": 5560000,
+  "maxStateLoanAmount": 7500000,
+  "stateLoanTermYears": 15,
+  "monthlyStateLoanPayment": 30889,
   "estimatedYearlySavings": 270000,
   "penaltyLostSavings": 1462407,
   "penaltyCapexInflation": 1602433,

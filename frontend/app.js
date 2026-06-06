@@ -694,13 +694,15 @@ function buildNzuInput() {
   const footprintArea =
     Number(building.builtAreaM2) ||
     (Number(building.floors) > 0 ? floorArea / Number(building.floors) : floorArea / 3);
+  const selectedGoals = getSelectedNzuGoals();
 
   return {
     floorArea,
     footprintArea,
     numberOfFlats,
     vulnerableFlats: estimateVulnerableFlats(numberOfFlats),
-    selectedGoals: getSelectedNzuGoals(),
+    selectedGoals,
+    renovationType: selectedGoals.includes("INSULATION") ? "COMPLEX" : "PARTIAL",
   };
 }
 
@@ -811,7 +813,7 @@ function renderImpact() {
     createImpactCard(
       "Měsíční splátka při akci teď",
       calculation.monthlyStateLoanPayment,
-      "0% státní půjčka rozpočítaná na 25 let po odečtení přímé podpory pro zranitelné byty.",
+      `0% státní půjčka rozpočítaná na ${calculation.stateLoanTermYears} let po odečtení bonusu pro zranitelné byty.`,
     ),
     createImpactCard(
       "Roční úspora energií",
@@ -821,7 +823,7 @@ function renderImpact() {
     createImpactCard(
       "Přímá podpora zranitelným",
       calculation.directSubsidyVulnerable,
-      "Proporční část investice krytá dotací pro seniory a nízkopříjmové domácnosti.",
+      "Bonus při komplexní renovaci: až 2 000 Kč/m² do 60 m² na zranitelný byt.",
     ),
   );
   renderImpactPlots(calculation);

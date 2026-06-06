@@ -133,9 +133,11 @@ Output:
 ```json
 {
   "grossCapEx": 5800000,
-  "directSubsidyVulnerable": 1160000,
-  "netStateLoanAmount": 4640000,
-  "monthlyStateLoanPayment": 15467,
+  "directSubsidyVulnerable": 240000,
+  "netStateLoanAmount": 5560000,
+  "maxStateLoanAmount": 7500000,
+  "stateLoanTermYears": 15,
+  "monthlyStateLoanPayment": 30889,
   "estimatedYearlySavings": 270000,
   "penaltyLostSavings": 1462407,
   "penaltyCapexInflation": 1602433,
@@ -151,6 +153,14 @@ Supported goals:
 - `PHOTOVOLTAICS`
 - `GREEN_ROOF`
 - `VENTILATION`
+
+Loan/subsidy assumptions:
+
+- `PARTIAL`: 0% loan up to `250 000 Kč / byt`.
+- `COMPLEX`: 0% loan up to `750 000 Kč / byt`.
+- If `renovationType` is omitted, calculator treats any input containing `INSULATION` as `COMPLEX`, otherwise `PARTIAL`.
+- State loan term is `10 years` up to `1.5 mil. Kč`, otherwise `15 years`.
+- Vulnerable household bonus applies only to `COMPLEX`: `2 000 Kč/m²`, capped at `60 m²` per vulnerable flat, max `120 000 Kč/byt`.
 
 ## Material Generation
 

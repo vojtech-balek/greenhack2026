@@ -140,6 +140,7 @@ function arrayOfStrings(value) {
 
 function normalizeOnePager(value, payload) {
   const calculation = payload.context?.calculation?.result || {};
+  const stateLoanTermYears = calculation.stateLoanTermYears || 10;
   const nonFinancialBenefits = payload.context?.nonFinancialBenefits || [
     "stabilnější teplota v bytech",
     "méně průvanu, vlhkosti a hluku",
@@ -159,7 +160,7 @@ function normalizeOnePager(value, payload) {
     {
       label: "Měsíční 0% splátka",
       value: formatCurrencyPlain(calculation.monthlyStateLoanPayment),
-      note: "při státní půjčce na 25 let",
+      note: `při státní půjčce na ${stateLoanTermYears} let`,
     },
   ];
 
