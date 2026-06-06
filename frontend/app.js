@@ -99,6 +99,49 @@ const questions = [
   },
 ];
 
+const personas = [
+  {
+    id: "opatrna",
+    name: "Paní Opatrná",
+    type: "Debt-averse pensioner",
+    image: "/img/personas/pani_opatrna.png",
+    description:
+      "Žije z pevného důchodu a půjčka pro ni znamená osobní hrozbu. Bojí se dluhu víc než pomalu rostoucích účtů.",
+  },
+  {
+    id: "kalkulacka",
+    name: "Pan Kalkulačka",
+    type: "Absentee investor",
+    image: "/img/personas/pan_kalkulacka.png",
+    description:
+      "V domě nebydlí a náklady na energie platí nájemník. Slyší hlavně na růst hodnoty bytu a budoucí regulace.",
+  },
+  {
+    id: "zitrek",
+    name: "Pan Zítřek",
+    type: "Chronic procrastinator",
+    initials: "Z",
+    description:
+      "Souhlasí v principu, ale proces mu připadá složitý. Chce další schůzi, další nabídky a další odklad.",
+  },
+  {
+    id: "neduverivy",
+    name: "Pan Nedůvěřivý",
+    type: "Suspicious penny-pincher",
+    initials: "N",
+    description:
+      "Čeká podvod od firem, bank i dotací. Soustředí se na vysokou cenu a přehlíží drahé nicnedělání.",
+  },
+  {
+    id: "inzenyr",
+    name: "Pan Inženýr",
+    type: "Over-analyzer",
+    initials: "I",
+    description:
+      "Chce stoprocentní jistotu, přesné modely a právní rozbory. Nekonečná data drží rozhodnutí mimo dosah.",
+  },
+];
+
 const scopeImpact = {
   zatepleni: 28000,
   fotovoltaika: 22000,
@@ -144,6 +187,7 @@ const state = {
   buildingInfo: null,
   selectedScopes: new Set(),
   answers: Object.fromEntries(questions.map((question) => [question.id, null])),
+  selectedPersonas: new Map(),
 };
 
 const addressForm = document.querySelector("#addressForm");
@@ -173,6 +217,12 @@ const communityCount = document.querySelector("#communityCount");
 const communitySummary = document.querySelector("#communitySummary");
 const communityStats = document.querySelector("#communityStats");
 const communityGrid = document.querySelector("#communityGrid");
+const communityNext = document.querySelector("#communityNext");
+const personaStrip = document.querySelector(".persona-strip");
+const personaForm = document.querySelector("#personaForm");
+const personaDescription = document.querySelector("#personaDescription");
+const personaSelectionStatus = document.querySelector("#personaSelectionStatus");
+const personaNext = document.querySelector("#personaNext");
 
 function setLoading(isLoading) {
   addressSubmit.disabled = isLoading;
@@ -662,8 +712,119 @@ function handleQuestionnaireSubmit(event) {
   scrollToSection(impactStage);
 }
 
+function createPersonaCard(persona, options = {}) {
+  const card = document.createElement("button");
+  card.className = options.isCustom ? "persona-card persona-card-custom" : "persona-card";
+  card.type = "button";
+  card.dataset.personaId = persona.id;
+  card.setAttribute("aria-pressed", "false");
+
+  const image = document.createElement("div");
+  image.className = persona.image ? "persona-image persona-image-real" : "persona-image";
+  image.setAttribute("aria-hidden", "true");
+
+  if (persona.image) {
+    const img = document.createElement("img");
+    img.src = persona.image;
+    img.alt = "";
+    img.loading = "lazy";
+    image.append(img);
+  } else {
+    const initials = document.createElement("span");
+    initials.className = "persona-initials";
+    initials.textContent = persona.initials || persona.name.slice(0, 1);
+    image.append(initials);
+  }
+
+  const content = document.createElement("div");
+  content.className = "persona-content";
+
+  const title = document.createElement("h3");
+  title.textContent = persona.name;
+
+  const label = document.createElement("span");
+  label.className = "persona-type";
+  label.textContent = persona.type;
+
+  const text = document.createElement("p");
+  text.textContent = persona.description;
+
+  content.append(title, label, text);
+  card.append(image, content);
+  card.addEventListener("click", () => togglePersona(card));
+
+  return card;
+}
+
+function renderPersonas() {
+  personaStrip.replaceChildren(...personas.map((persona) => createPersonaCard(persona)));
+}
+
+function syncPersonaSelection() {
+  document.querySelectorAll("[data-persona-id]").forEach((card) => {
+    const isSelected = state.selectedPersonas.has(card.dataset.personaId);
+    card.classList.toggle("is-selected", isSelected);
+    card.setAttribute("aria-pressed", String(isSelected));
+  });
+
+  const count = state.selectedPersonas.size;
+  personaSelectionStatus.textContent =
+    count > 0
+      ? `Uloženo pro další krok: ${count} ${count === 1 ? "persona" : count < 5 ? "persony" : "person"}.`
+      : "Vyberte persony, které v domě potkáváte.";
+}
+
+function togglePersona(card) {
+  const id = card.dataset.personaId;
+  const persona = {
+    id,
+    name: card.querySelector("h3")?.textContent || "Persona",
+    type: card.querySelector(".persona-type")?.textContent || "",
+    description: card.querySelector("p")?.textContent || "",
+  };
+
+  if (state.selectedPersonas.has(id)) {
+    state.selectedPersonas.delete(id);
+  } else {
+    state.selectedPersonas.set(id, persona);
+  }
+
+  syncPersonaSelection();
+}
+
+function handlePersonaSubmit(event) {
+  event.preventDefault();
+
+  const description = personaDescription.value.trim();
+
+  if (!description) {
+    personaDescription.focus();
+    return;
+  }
+
+  const personaId = `custom-${Date.now()}`;
+  const persona = {
+    id: personaId,
+    name: "Vlastní persona",
+    type: "Popis z vašeho domu",
+    initials: "+",
+    description,
+  };
+  const card = createPersonaCard(persona, { isCustom: true });
+
+  personaStrip.append(card);
+  state.selectedPersonas.set(personaId, persona);
+  personaDescription.value = "";
+  syncPersonaSelection();
+}
+
 addressForm.addEventListener("submit", handleAddressSubmit);
 scopeForm.addEventListener("submit", handleScopeSubmit);
 basicInfoForm.addEventListener("submit", handleQuestionnaireSubmit);
 impactNext.addEventListener("click", () => scrollToSection(communityStage));
+communityNext.addEventListener("click", () => scrollToSection(document.querySelector("#personasStage")));
+personaForm.addEventListener("submit", handlePersonaSubmit);
+personaNext.addEventListener("click", () => scrollToSection(document.querySelector("#actionStage")));
+renderPersonas();
+syncPersonaSelection();
 renderScopeTiles();

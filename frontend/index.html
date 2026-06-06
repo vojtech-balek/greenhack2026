@@ -135,47 +135,99 @@
               <div class="community-grid" id="communityGrid"></div>
             </div>
           </div>
+          <div class="community-actions">
+            <p class="scope-message">Další krok pomůže pojmenovat sousedy, které potřebujete přesvědčit.</p>
+            <button class="scope-submit" id="communityNext" type="button">
+              <span>Jdeme dál</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
         </div>
       </section>
 
       <section class="personas-section" id="personasStage" aria-labelledby="personasTitle" tabindex="-1">
         <div class="section-shell">
           <div class="section-heading">
-            <p class="eyebrow">S kým jednáte</p>
             <h2 id="personasTitle">V domě nejsou všichni stejní. S každým se mluví jinak.</h2>
           </div>
 
-          <div class="persona-strip" aria-label="Typické persony v SVJ">
-            <article class="persona-card">
-              <div class="persona-image" aria-hidden="true"></div>
-              <h3>Paní Opatrná</h3>
-              <span>Debt-averse pensioner</span>
-              <p>Žije z pevného důchodu a půjčka pro ni znamená osobní hrozbu. Bojí se dluhu víc než pomalu rostoucích účtů.</p>
+          <div class="personas-layout">
+            <div class="persona-strip" aria-label="Typické persony v SVJ"></div>
+
+            <aside class="persona-side">
+              <form class="persona-form" id="personaForm">
+                <label for="personaDescription">Chybí vám někdo z domu?</label>
+                <textarea
+                  id="personaDescription"
+                  rows="5"
+                  placeholder="Popište souseda vlastními slovy..."
+                ></textarea>
+                <button class="scope-submit" type="submit">
+                  <span>Přidat personu</span>
+                  <span aria-hidden="true">+</span>
+                </button>
+              </form>
+              <p class="persona-selection-status" id="personaSelectionStatus">Vyberte persony, které v domě potkáváte.</p>
+              <button class="scope-submit persona-next" id="personaNext" type="button">
+                <span>Pojďme to rozhejbat</span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="action-section" id="actionStage" aria-labelledby="actionTitle" tabindex="-1">
+        <div class="section-shell action-shell">
+          <div class="action-heading">
+            <h2 id="actionTitle">Pojďme to rozhejbat</h2>
+            <p>
+              Stáhněte si všechno, co jsme o vašem domě zjistili. Připravené formáty pro schůzi,
+              nástěnku i skupinový chat.
+            </p>
+          </div>
+
+          <div class="action-feature-grid" aria-label="Materiály pro další krok">
+            <article class="action-feature-card">
+              <div class="action-feature-icon" aria-hidden="true">PDF</div>
+              <h3>Tahák na schůzi SVJ</h3>
+              <p>Jednostránkové shrnutí: bilance, úspory a argumenty pro sousedy. Vytisknout a rozdat na příštím SVJ.</p>
+              <button class="action-feature-button" type="button">
+                <span aria-hidden="true">↓</span>
+                <span>Stáhnout PDF</span>
+              </button>
             </article>
-            <article class="persona-card">
-              <div class="persona-image" aria-hidden="true"></div>
-              <h3>Pan Kalkulačka</h3>
-              <span>Absentee investor</span>
-              <p>V domě nebydlí a náklady na energie platí nájemník. Slyší hlavně na růst hodnoty bytu a budoucí regulace.</p>
+
+            <article class="action-feature-card">
+              <div class="action-feature-icon action-feature-icon-green" aria-hidden="true">CH</div>
+              <h3>Zpráva do chatu</h3>
+              <p>Předpřipravený neformální text pro WhatsApp, Viber nebo Messenger. Bez vysvětlování navíc.</p>
+              <button class="action-feature-button" type="button">
+                <span aria-hidden="true">◉</span>
+                <span>Zobrazit a zkopírovat</span>
+              </button>
             </article>
-            <article class="persona-card">
-              <div class="persona-image" aria-hidden="true"></div>
-              <h3>Pan Zítřek</h3>
-              <span>Chronic procrastinator</span>
-              <p>Souhlasí v principu, ale proces mu připadá složitý. Chce další schůzi, další nabídky a další odklad.</p>
+
+            <article class="action-feature-card">
+              <div class="action-feature-icon action-feature-icon-blue" aria-hidden="true">A4</div>
+              <h3>Leták na nástěnku</h3>
+              <p>A4 vizuální infografika do výtahu nebo foyer. Čitelná za 15 sekund, bez dalšího kontextu.</p>
+              <button class="action-feature-button" type="button">
+                <span aria-hidden="true">↓</span>
+                <span>Stáhnout leták</span>
+              </button>
             </article>
-            <article class="persona-card">
-              <div class="persona-image" aria-hidden="true"></div>
-              <h3>Pan Nedůvěřivý</h3>
-              <span>Suspicious penny-pincher</span>
-              <p>Čeká podvod od firem, bank i dotací. Soustředí se na vysokou cenu a přehlíží drahé nicnedělání.</p>
-            </article>
-            <article class="persona-card">
-              <div class="persona-image" aria-hidden="true"></div>
-              <h3>Pan Inženýr</h3>
-              <span>Over-analyzer</span>
-              <p>Chce stoprocentní jistotu, přesné modely a právní rozbory. Nekonečná data drží rozhodnutí mimo dosah.</p>
-            </article>
+          </div>
+
+          <div class="action-specialist">
+            <p>
+              Chcete další krok? Propojíme vás se specialistou, který pomůže rychle poskládat řešení pro váš dům.
+              Zdarma, bez závazku.
+            </p>
+            <button class="scope-submit" type="button">
+              <span>Spojit se specialistou</span>
+              <span aria-hidden="true">→</span>
+            </button>
           </div>
         </div>
       </section>
