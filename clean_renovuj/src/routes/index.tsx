@@ -315,28 +315,6 @@ const STEP_LABELS: Record<Step, string> = {
   distribution: "Distribution",
 };
 
-type PersistedState = {
-  address?: string;
-  step?: Step;
-  selected?: string[];
-  answers?: Record<string, string>;
-  maxStepIndex?: number;
-  buildingInfo?: any;
-  calculation?: any;
-  communityData?: any;
-};
-
-function loadPersisted(): PersistedState {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PersistedState) : {};
-  } catch {
-    return {};
-  }
-}
-
-
 function LandingPage() {
   const [address, setAddress] = useState("");
   const [step, setStep] = useState<Step>("hero");
@@ -360,44 +338,14 @@ function LandingPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
 
 
-  // Restore persisted state on the client BEFORE first paint to avoid a
-  // hero -> last-step flash. We render nothing until hydrated.
   useEffect(() => {
-    const persisted = loadPersisted();
-    if (persisted.address) setAddress(persisted.address);
-    if (persisted.step) setStep(persisted.step);
-    if (persisted.selected) setSelected(new Set(persisted.selected));
-    if (persisted.answers) setAnswers(persisted.answers);
-    if (persisted.buildingInfo) setBuildingInfo(persisted.buildingInfo);
-    if (persisted.calculation) setCalculation(persisted.calculation);
-    if (persisted.communityData) setCommunityData(persisted.communityData);
-    const restoredStepIdx = persisted.step ? STEPS.indexOf(persisted.step) : 0;
-    setMaxStepIndex(
-      Math.max(persisted.maxStepIndex ?? 0, restoredStepIdx >= 0 ? restoredStepIdx : 0),
-    );
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore storage access errors */
+    }
     setHydrated(true);
   }, []);
-
-  useEffect(() => {
-    if (!hydrated || typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          address,
-          step,
-          selected: Array.from(selected),
-          answers,
-          maxStepIndex,
-          buildingInfo,
-          calculation,
-          communityData,
-        } satisfies PersistedState),
-      );
-    } catch {
-      /* ignore quota errors */
-    }
-  }, [hydrated, address, step, selected, answers, maxStepIndex, buildingInfo, calculation, communityData]);
 
   // Dynamic NZÚ Calculation hook
   useEffect(() => {
@@ -2399,13 +2347,7 @@ function SplitShell({
 
 
 function AiHintBubble() {
-  const [dismissed, setDismissed] = useState(true);
-  useEffect(() => {
-    setDismissed(
-      typeof window !== "undefined" &&
-        window.localStorage.getItem("aiHintDismissed") === "1",
-    );
-  }, []);
+  const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
     <BodyPortal>
@@ -2418,9 +2360,6 @@ function AiHintBubble() {
             type="button"
             onClick={() => {
               setDismissed(true);
-              try {
-                window.localStorage.setItem("aiHintDismissed", "1");
-              } catch {}
             }}
             aria-label="Dismiss"
             className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
@@ -3130,4 +3069,3 @@ function ProcessingOverlay() {
     </div>
   );
 }
-
