@@ -545,6 +545,98 @@ input {
   line-height: 1.45;
 }
 
+.impact-plots {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1px;
+  margin-top: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-top: 0;
+}
+
+.impact-plot-card {
+  min-width: 0;
+  padding: clamp(22px, 3vw, 34px);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.impact-plot-card h3 {
+  margin: 0;
+  font-size: clamp(22px, 2.4vw, 34px);
+  line-height: 1.05;
+}
+
+.penalty-bars {
+  display: grid;
+  gap: 18px;
+  margin-top: 30px;
+}
+
+.penalty-bar-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.9fr) minmax(120px, 1.4fr);
+  gap: 9px 16px;
+  align-items: center;
+}
+
+.penalty-bar-row span {
+  color: #706d69;
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.penalty-bar-row strong {
+  grid-column: 2;
+  color: var(--ink);
+  font-size: clamp(18px, 1.8vw, 26px);
+  line-height: 1;
+}
+
+.penalty-bar-track {
+  height: 13px;
+  overflow: hidden;
+  background: var(--panel-soft);
+}
+
+.penalty-bar-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.impact-line-chart {
+  width: 100%;
+  height: auto;
+  margin-top: 20px;
+  display: block;
+}
+
+.impact-line-chart line {
+  stroke: rgba(23, 23, 23, 0.16);
+  stroke-width: 1;
+}
+
+.impact-line-chart path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.impact-line-chart circle {
+  fill: var(--panel);
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.impact-line-chart text {
+  fill: #706d69;
+  font-size: 13px;
+  font-weight: 760;
+}
+
 .community-layout {
   display: grid;
   grid-template-columns: minmax(260px, 0.68fr) minmax(0, 1.32fr);
@@ -971,6 +1063,12 @@ input {
   transform: translateY(-1px);
 }
 
+.action-feature-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+  transform: none;
+}
+
 .action-specialist {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -986,6 +1084,59 @@ input {
   font-size: clamp(24px, 2.8vw, 38px);
   font-weight: 760;
   line-height: 1.12;
+}
+
+.material-output {
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--line);
+}
+
+.material-output[hidden] {
+  display: none;
+}
+
+.material-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.material-output-header span {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 760;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.material-copy {
+  border: 1px solid rgba(47, 95, 85, 0.24);
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.material-copy:hover,
+.material-copy:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.material-output pre {
+  max-height: 560px;
+  margin: 0;
+  overflow: auto;
+  padding: 20px;
+  color: #3e3b38;
+  font: 15px/1.55 "Neue Haas Grotesk Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  white-space: pre-wrap;
 }
 
 .building-card {
@@ -1268,6 +1419,18 @@ input {
 
   .impact-lead {
     min-height: 310px;
+  }
+
+  .impact-plots {
+    grid-template-columns: 1fr;
+  }
+
+  .penalty-bar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .penalty-bar-row strong {
+    grid-column: 1;
   }
 
   .impact-actions,

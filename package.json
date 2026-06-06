@@ -10,6 +10,6 @@
     "preprocess:reconstructions:geocode": "node scripts/preprocess-reconstructions.mjs --geocode",
     "preprocess:svj-addresses": "node scripts/standardize-svj-addresses.mjs",
     "preprocess:svj-addresses:geocode": "node scripts/standardize-svj-addresses.mjs --geocode",
-    "check": "node --check backend/server.mjs && node --check frontend/app.js"
+    "check": "node --check backend/server.mjs && node --check backend/materials.js && node --check frontend/app.js && node --check frontend/nzuCalculator.js && node --check backend/nzuCalculator.js && node scripts/test-nzu-calculator.mjs"
   }
 }

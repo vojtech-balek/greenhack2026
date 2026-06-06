@@ -104,6 +104,7 @@
             </article>
             <div class="impact-grid" id="impactGrid"></div>
           </div>
+          <div class="impact-plots" id="impactPlots" aria-label="Vizualizace dopadu odkladu"></div>
           <div class="impact-actions">
             <p class="scope-message">Další krok ukáže podobná SVJ, která už podporu získala.</p>
             <button class="scope-submit" id="impactNext" type="button">
@@ -190,9 +191,9 @@
           <div class="action-feature-grid" aria-label="Materiály pro další krok">
             <article class="action-feature-card">
               <div class="action-feature-icon" aria-hidden="true">PDF</div>
-              <h3>Tahák na schůzi SVJ</h3>
+              <h3>Podklad na schůzi SVJ</h3>
               <p>Jednostránkové shrnutí: bilance, úspory a argumenty pro sousedy. Vytisknout a rozdat na příštím SVJ.</p>
-              <button class="action-feature-button" type="button">
+              <button class="action-feature-button" type="button" data-material-format="pdf">
                 <span aria-hidden="true">↓</span>
                 <span>Stáhnout PDF</span>
               </button>
@@ -202,7 +203,7 @@
               <div class="action-feature-icon action-feature-icon-green" aria-hidden="true">CH</div>
               <h3>Zpráva do chatu</h3>
               <p>Předpřipravený neformální text pro WhatsApp, Viber nebo Messenger. Bez vysvětlování navíc.</p>
-              <button class="action-feature-button" type="button">
+              <button class="action-feature-button" type="button" data-material-format="whatsapp">
                 <span aria-hidden="true">◉</span>
                 <span>Zobrazit a zkopírovat</span>
               </button>
@@ -212,7 +213,7 @@
               <div class="action-feature-icon action-feature-icon-blue" aria-hidden="true">A4</div>
               <h3>Leták na nástěnku</h3>
               <p>A4 vizuální infografika do výtahu nebo foyer. Čitelná za 15 sekund, bez dalšího kontextu.</p>
-              <button class="action-feature-button" type="button">
+              <button class="action-feature-button" type="button" data-material-format="leaflet">
                 <span aria-hidden="true">↓</span>
                 <span>Stáhnout leták</span>
               </button>
@@ -229,10 +230,17 @@
               <span aria-hidden="true">→</span>
             </button>
           </div>
+          <article class="material-output" id="materialOutput" hidden>
+            <div class="material-output-header">
+              <span id="materialOutputLabel">Výstup</span>
+              <button class="material-copy" id="materialCopy" type="button">Kopírovat</button>
+            </div>
+            <pre id="materialOutputText"></pre>
+          </article>
         </div>
       </section>
     </main>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

@@ -1,3 +1,5 @@
+import { calculateNzuRenovation } from "./nzuCalculator.js";
+
 const scopeOptions = [
   {
     id: "zatepleni",
@@ -185,6 +187,9 @@ const answerImpact = {
 const state = {
   address: "",
   buildingInfo: null,
+  latestCalculation: null,
+  latestNzuInput: null,
+  latestCommunityData: null,
   selectedScopes: new Set(),
   answers: Object.fromEntries(questions.map((question) => [question.id, null])),
   selectedPersonas: new Map(),
@@ -211,6 +216,7 @@ const impactStage = document.querySelector("#impactStage");
 const impactTotal = document.querySelector("#impactTotal");
 const impactSummary = document.querySelector("#impactSummary");
 const impactGrid = document.querySelector("#impactGrid");
+const impactPlots = document.querySelector("#impactPlots");
 const impactNext = document.querySelector("#impactNext");
 const communityStage = document.querySelector("#communityStage");
 const communityCount = document.querySelector("#communityCount");
@@ -223,6 +229,10 @@ const personaForm = document.querySelector("#personaForm");
 const personaDescription = document.querySelector("#personaDescription");
 const personaSelectionStatus = document.querySelector("#personaSelectionStatus");
 const personaNext = document.querySelector("#personaNext");
+const materialOutput = document.querySelector("#materialOutput");
+const materialOutputLabel = document.querySelector("#materialOutputLabel");
+const materialOutputText = document.querySelector("#materialOutputText");
+const materialCopy = document.querySelector("#materialCopy");
 
 function setLoading(isLoading) {
   addressSubmit.disabled = isLoading;
@@ -636,6 +646,7 @@ function renderCommunityStats(stats) {
 }
 
 function renderCommunityExamples(data) {
+  state.latestCommunityData = data;
   const localText =
     data.mode === "same-city"
       ? `${data.localCount} úspěšných SVJ ve stejné obci`
@@ -650,46 +661,170 @@ function renderCommunityExamples(data) {
   communityGrid.replaceChildren(...data.examples.map(createCommunityCard));
 }
 
-function calculateImpact() {
-  const selectedScopeCost = [...state.selectedScopes].reduce(
-    (sum, scopeId) => sum + (scopeImpact[scopeId] || 0),
-    0,
-  );
-  const answerCost = Object.entries(state.answers).reduce(
-    (sum, [questionId, value]) => sum + (answerImpact[questionId]?.[value] || 0),
-    0,
-  );
-  const buildingFactor = normalizeUsage(state.buildingInfo?.building?.usage) === "bytový dům" ? 1.35 : 1;
-  const yearlyCost = Math.round((selectedScopeCost + answerCost) * buildingFactor);
-  const threeYearCost = Math.round(yearlyCost * 3.18);
-  const missedSubsidy = Math.round(selectedScopeCost * 1.8);
+const scopeGoalMap = {
+  zatepleni: "INSULATION",
+  fotovoltaika: "PHOTOVOLTAICS",
+  "zdroj-tepla": "HEAT_SOURCE",
+  rekuperace: "VENTILATION",
+  "zelena-strecha": "GREEN_ROOF",
+};
 
-  return { yearlyCost, threeYearCost, missedSubsidy, selectedScopeCost, answerCost };
+function getSelectedNzuGoals() {
+  return [...state.selectedScopes].map((scopeId) => scopeGoalMap[scopeId]).filter(Boolean);
+}
+
+function estimateVulnerableFlats(numberOfFlats) {
+  const demographicsAnswer = state.answers.demographics;
+
+  if (demographicsAnswer === "yes") {
+    return Math.max(1, Math.round(numberOfFlats * 0.3));
+  }
+
+  if (demographicsAnswer === "unknown") {
+    return Math.max(0, Math.round(numberOfFlats * 0.15));
+  }
+
+  return 0;
+}
+
+function buildNzuInput() {
+  const building = state.buildingInfo?.building || {};
+  const numberOfFlats = Math.max(1, Number(building.flats) || 12);
+  const floorArea = Number(building.floorAreaM2) || numberOfFlats * 70;
+  const footprintArea =
+    Number(building.builtAreaM2) ||
+    (Number(building.floors) > 0 ? floorArea / Number(building.floors) : floorArea / 3);
+
+  return {
+    floorArea,
+    footprintArea,
+    numberOfFlats,
+    vulnerableFlats: estimateVulnerableFlats(numberOfFlats),
+    selectedGoals: getSelectedNzuGoals(),
+  };
+}
+
+function createPenaltyBars(calculation) {
+  const items = [
+    { label: "Dražší stavba", value: calculation.penaltyCapexInflation },
+    { label: "Ztracené úspory", value: calculation.penaltyLostSavings },
+    { label: "Komerční úrok", value: calculation.penaltyLostZeroInterest },
+  ];
+  const maxValue = Math.max(...items.map((item) => item.value), 1);
+  const chart = document.createElement("article");
+  chart.className = "impact-plot-card";
+
+  const title = document.createElement("h3");
+  title.textContent = "Z čeho se skládá trest za čekání";
+
+  const bars = document.createElement("div");
+  bars.className = "penalty-bars";
+
+  items.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "penalty-bar-row";
+
+    const label = document.createElement("span");
+    label.textContent = item.label;
+
+    const track = document.createElement("div");
+    track.className = "penalty-bar-track";
+
+    const fill = document.createElement("div");
+    fill.className = "penalty-bar-fill";
+    fill.style.width = `${Math.max(8, (item.value / maxValue) * 100)}%`;
+
+    const value = document.createElement("strong");
+    value.textContent = formatCurrency(item.value);
+
+    track.append(fill);
+    row.append(label, track, value);
+    bars.append(row);
+  });
+
+  chart.append(title, bars);
+  return chart;
+}
+
+function createWaitTrajectory(calculation) {
+  const years = [0, 1, 2, 3, 4, 5];
+  const points = years.map((year) => ({
+    year,
+    value:
+      calculation.penaltyLostZeroInterest * (year / 5) +
+      calculation.penaltyCapexInflation * (year / 5) +
+      calculation.estimatedYearlySavings * year,
+  }));
+  const maxValue = Math.max(...points.map((point) => point.value), 1);
+  const width = 560;
+  const height = 230;
+  const padX = 34;
+  const padY = 24;
+  const plotWidth = width - padX * 2;
+  const plotHeight = height - padY * 2;
+  const path = points
+    .map((point, index) => {
+      const x = padX + (point.year / 5) * plotWidth;
+      const y = height - padY - (point.value / maxValue) * plotHeight;
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const pointMarkers = points
+    .map((point) => {
+      const x = padX + (point.year / 5) * plotWidth;
+      const y = height - padY - (point.value / maxValue) * plotHeight;
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" />`;
+    })
+    .join("");
+  const chart = document.createElement("article");
+  chart.className = "impact-plot-card impact-line-card";
+  chart.innerHTML = `
+    <h3>Čím déle čekáte, tím dražší je start</h3>
+    <svg class="impact-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Růst nákladů čekání po pěti letech">
+      <line x1="${padX}" y1="${height - padY}" x2="${width - padX}" y2="${height - padY}" />
+      <line x1="${padX}" y1="${padY}" x2="${padX}" y2="${height - padY}" />
+      <path d="${path}" />
+      ${pointMarkers}
+      <text x="${padX}" y="${height - 4}">teď</text>
+      <text x="${width - padX - 40}" y="${height - 4}">za 5 let</text>
+      <text x="${width - padX - 132}" y="${padY + 14}">${formatCurrency(calculation.totalWaitPenalty)}</text>
+    </svg>
+  `;
+
+  return chart;
+}
+
+function renderImpactPlots(calculation) {
+  impactPlots.replaceChildren(createPenaltyBars(calculation), createWaitTrajectory(calculation));
 }
 
 function renderImpact() {
-  const impact = calculateImpact();
-  impactTotal.textContent = formatCurrency(impact.threeYearCost);
+  const nzuInput = buildNzuInput();
+  const calculation = calculateNzuRenovation(nzuInput);
+  state.latestNzuInput = nzuInput;
+  state.latestCalculation = calculation;
+  impactTotal.textContent = formatCurrency(calculation.totalWaitPenalty);
   impactSummary.textContent =
-    "Placeholder odhad kombinuje vybraná opatření, odpovědi z dotazníku a typ domu. Slouží jen pro hackathonový prototyp.";
+    "Odhad podle NZÚ: dotace kryje podíl zranitelných domácností, zbytek dnes financuje 0% státní půjčka. Čekání zdražuje stavbu, bere úspory a může nahradit 0% půjčku komerčním úrokem.";
 
   impactGrid.replaceChildren(
     createImpactCard(
-      "Roční náklady čekání",
-      impact.yearlyCost,
-      "Hrubý dopad vyšších energií, údržby a horší připravenosti projektu.",
+      "Měsíční splátka při akci teď",
+      calculation.monthlyStateLoanPayment,
+      "0% státní půjčka rozpočítaná na 25 let po odečtení přímé podpory pro zranitelné byty.",
     ),
     createImpactCard(
-      "Tříletý odklad",
-      impact.threeYearCost,
-      "Ukazuje, jak se může malý roční dopad nasčítat při čekání.",
+      "Roční úspora energií",
+      calculation.estimatedYearlySavings,
+      "Součet úspor z vybraných opatření, zastropovaný na 85 % dnešních nákladů.",
     ),
     createImpactCard(
-      "Riziko nevyužité podpory",
-      impact.missedSubsidy,
-      "Orientační hodnota příležitosti navázaná na zvolená opatření.",
+      "Přímá podpora zranitelným",
+      calculation.directSubsidyVulnerable,
+      "Proporční část investice krytá dotací pro seniory a nízkopříjmové domácnosti.",
     ),
   );
+  renderImpactPlots(calculation);
 }
 
 function handleQuestionnaireSubmit(event) {
@@ -818,6 +953,196 @@ function handlePersonaSubmit(event) {
   syncPersonaSelection();
 }
 
+function getSelectedScopeDetails() {
+  return [...state.selectedScopes].map((scopeId) => {
+    const option = scopeOptions.find((scope) => scope.id === scopeId);
+    return {
+      id: scopeId,
+      label: option?.label || scopeId,
+      nzuGoal: scopeGoalMap[scopeId] || null,
+    };
+  });
+}
+
+function getAnsweredQuestions() {
+  return Object.entries(state.answers)
+    .filter(([, value]) => value)
+    .map(([questionId, value]) => {
+      const question = questions.find((item) => item.id === questionId);
+      const option = question?.options.find((item) => item.value === value);
+      return {
+        id: questionId,
+        question: question?.text || questionId,
+        answer: option?.label || value,
+      };
+    });
+}
+
+function getMaterialCalculation() {
+  if (!state.latestCalculation || !state.latestNzuInput) {
+    const nzuInput = buildNzuInput();
+    state.latestNzuInput = nzuInput;
+    state.latestCalculation = calculateNzuRenovation(nzuInput);
+  }
+
+  return {
+    input: state.latestNzuInput,
+    result: state.latestCalculation,
+  };
+}
+
+function getMaterialVisuals(calculation) {
+  return {
+    penaltyBreakdown: [
+      { label: "Dražší stavba", value: calculation.penaltyCapexInflation },
+      { label: "Ztracené úspory", value: calculation.penaltyLostSavings },
+      { label: "Komerční úrok", value: calculation.penaltyLostZeroInterest },
+    ],
+    waitTrajectorySvg: impactPlots.querySelector(".impact-line-chart")?.outerHTML || null,
+    suggestedCharts: [
+      "bar chart: dražší stavba vs ztracené úspory vs komerční úrok",
+      "line chart: růst nákladů čekání od teď do 5 let",
+    ],
+  };
+}
+
+function buildMaterialPayload(format) {
+  const calculation = getMaterialCalculation();
+  const building = state.buildingInfo?.building || {};
+  const address = state.buildingInfo?.address || {};
+  const selectedPersonas = [...state.selectedPersonas.values()];
+  const nonFinancialBenefits = [
+    "stabilnější teplota v bytech v zimě i v létě",
+    "méně průvanu, vlhkosti a rizika plísní",
+    "tišší byty díky lepší obálce domu",
+    "zdravější vnitřní vzduch při vhodném větrání",
+    "lepší vzhled domu a společných prostor",
+    "méně havárií a neplánovaných oprav",
+    "lepší připravenost na budoucí energetické požadavky",
+    "férovější řešení pro zranitelné sousedy",
+  ];
+
+  return {
+    format,
+    context: {
+      address: {
+        input: state.address,
+        municipalityName: address.municipalityName || null,
+        streetName: address.streetName || null,
+        cp: address.cp || null,
+      },
+      building: {
+        usage: building.usage || null,
+        completedAt: building.completedAt || null,
+        floorAreaM2: building.floorAreaM2 || calculation.input.floorArea,
+        builtAreaM2: building.builtAreaM2 || calculation.input.footprintArea,
+        floors: building.floors || null,
+        flats: building.flats || calculation.input.numberOfFlats,
+        heating: building.utilities?.heating || null,
+      },
+      selectedGoals: getSelectedScopeDetails(),
+      answeredQuestions: getAnsweredQuestions(),
+      nonFinancialBenefits,
+      calculation,
+      selectedPersonas,
+    },
+    selectedPersonas,
+    visuals: getMaterialVisuals(calculation.result),
+    localExamples: {
+      summary: state.latestCommunityData
+        ? {
+            mode: state.latestCommunityData.mode,
+            localCount: state.latestCommunityData.localCount,
+            stats: state.latestCommunityData.stats,
+          }
+        : null,
+      examples: (state.latestCommunityData?.examples || []).slice(0, 3),
+    },
+  };
+}
+
+async function generateMaterial(format, button) {
+  if (format === "pdf") {
+    await generatePdf(button);
+    return;
+  }
+
+  const originalLabel = button.innerHTML;
+  button.disabled = true;
+  button.textContent = "Generuji...";
+  materialOutput.hidden = false;
+  materialOutputLabel.textContent = "Generuji výstup";
+  materialOutputText.textContent = "Připravuji kontext domu, výpočty, grafy a persony...";
+
+  try {
+    const response = await fetch("/api/generate-material", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(buildMaterialPayload(format)),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Generování selhalo.");
+    }
+
+    materialOutputLabel.textContent =
+      format === "whatsapp" ? "Zpráva do chatu" : format === "leaflet" ? "Leták na nástěnku" : "Tahák na schůzi SVJ";
+    materialOutputText.textContent = data.content;
+  } catch (error) {
+    materialOutputLabel.textContent = "Generování selhalo";
+    materialOutputText.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalLabel;
+  }
+}
+
+async function generatePdf(button) {
+  const originalLabel = button.innerHTML;
+  button.disabled = true;
+  button.textContent = "Generuji PDF...";
+  materialOutput.hidden = false;
+  materialOutputLabel.textContent = "Generuji PDF";
+  materialOutputText.textContent = "Připravuji A4 podklad pro schůzi SVJ...";
+
+  try {
+    const response = await fetch("/api/generate-pdf", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(buildMaterialPayload("pdf")),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Generování PDF selhalo.");
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "renovace-svj-onepager.pdf";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+
+    materialOutputLabel.textContent = "PDF připraveno";
+    materialOutputText.textContent = "PDF bylo staženo jako renovace-svj-onepager.pdf.";
+  } catch (error) {
+    materialOutputLabel.textContent = "Generování PDF selhalo";
+    materialOutputText.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalLabel;
+  }
+}
+
 addressForm.addEventListener("submit", handleAddressSubmit);
 scopeForm.addEventListener("submit", handleScopeSubmit);
 basicInfoForm.addEventListener("submit", handleQuestionnaireSubmit);
@@ -825,6 +1150,16 @@ impactNext.addEventListener("click", () => scrollToSection(communityStage));
 communityNext.addEventListener("click", () => scrollToSection(document.querySelector("#personasStage")));
 personaForm.addEventListener("submit", handlePersonaSubmit);
 personaNext.addEventListener("click", () => scrollToSection(document.querySelector("#actionStage")));
+document.querySelectorAll("[data-material-format]").forEach((button) => {
+  button.addEventListener("click", () => generateMaterial(button.dataset.materialFormat, button));
+});
+materialCopy.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(materialOutputText.textContent);
+  materialCopy.textContent = "Zkopírováno";
+  window.setTimeout(() => {
+    materialCopy.textContent = "Kopírovat";
+  }, 1200);
+});
 renderPersonas();
 syncPersonaSelection();
 renderScopeTiles();

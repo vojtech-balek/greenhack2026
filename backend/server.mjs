@@ -2,6 +2,13 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  generateHoaOnePagerPdf,
+  generatePersuasionMaterial,
+  loadMaterialGeneratorConfig,
+  setMaterialGeneratorConfig,
+} from "./materials.js";
+import { calculateNzuRenovation } from "./nzuCalculator.js";
 
 const rootDir = fileURLToPath(new URL("..", import.meta.url));
 const frontendDir = join(rootDir, "frontend");
@@ -50,6 +57,8 @@ async function loadDotEnv(filePath) {
 
 const dotEnv = await loadDotEnv(join(rootDir, ".env"));
 const ruianApiKey = process.env.RUIAN_API_KEY || dotEnv.RUIAN_API_KEY || "";
+const materialGeneratorConfig = await loadMaterialGeneratorConfig({ ...dotEnv, ...process.env });
+setMaterialGeneratorConfig(materialGeneratorConfig);
 const buildingAttributeFields = [
   "kod",
   "typstavebnihoobjektukod",
@@ -78,7 +87,12 @@ const mimeTypes = {
 };
 
 function json(response, statusCode, body) {
-  response.writeHead(statusCode, { "content-type": mimeTypes[".json"] });
+  response.writeHead(statusCode, {
+    "content-type": mimeTypes[".json"],
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-headers": "content-type",
+  });
   response.end(JSON.stringify(body));
 }
 
@@ -868,6 +882,16 @@ async function serveStatic(request, response) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`);
 
+  if (request.method === "OPTIONS" && url.pathname.startsWith("/api/")) {
+    response.writeHead(204, {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,POST,OPTIONS",
+      "access-control-allow-headers": "content-type",
+    });
+    response.end();
+    return;
+  }
+
   if (url.pathname === "/api/health") {
     json(response, 200, { ok: true, service: "renovuj.me" });
     return;
@@ -909,6 +933,50 @@ const server = createServer(async (request, response) => {
       json(response, 200, buildingInfo);
     } catch (error) {
       json(response, 400, { error: error.message || "Nepodařilo se načíst údaje o domu." });
+    }
+
+    return;
+  }
+
+  if (url.pathname === "/api/calculate-renovation" && request.method === "POST") {
+    try {
+      const body = await readJsonBody(request);
+      json(response, 200, calculateNzuRenovation(body));
+    } catch (error) {
+      json(response, 400, { error: error.message || "Nepodařilo se spočítat renovaci." });
+    }
+
+    return;
+  }
+
+  if (url.pathname === "/api/generate-material" && request.method === "POST") {
+    try {
+      const body = await readJsonBody(request);
+      const content = await generatePersuasionMaterial(body);
+      json(response, 200, {
+        content,
+        model: materialGeneratorConfig.eInfraModel,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      json(response, 400, { error: error.message || "Nepodařilo se vygenerovat materiál." });
+    }
+
+    return;
+  }
+
+  if (url.pathname === "/api/generate-pdf" && request.method === "POST") {
+    try {
+      const body = await readJsonBody(request);
+      const pdf = await generateHoaOnePagerPdf(body);
+      response.writeHead(200, {
+        "content-type": "application/pdf",
+        "content-disposition": 'attachment; filename="renovace-svj-onepager.pdf"',
+        "access-control-allow-origin": "*",
+      });
+      response.end(pdf);
+    } catch (error) {
+      json(response, 400, { error: error.message || "Nepodařilo se vygenerovat PDF." });
     }
 
     return;
