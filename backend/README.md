@@ -50,14 +50,16 @@ Supported variables:
 | `RUIAN_API_KEY` | No | Optional API key for `ruian.fnx.io`. |
 | `E_INFRA_API_TOKEN` | Yes for generation | Bearer token for e-infra chat completions. |
 | `E_INFRA_MODEL` | No | LLM model. Defaults to `mini`. |
-| `PDF_BROWSER_PATH` | No | Optional path to Edge/Chrome executable for PDF printing. |
+| `PDF_BROWSER_PATH` | No | Optional path to Edge/Chrome executable for PDF printing (Windows only). |
 
 LLM endpoint is fixed in code:
 ```js
 https://llm.ai.e-infra.cz/v1/chat/completions
 ```
 
-PDF generation uses headless Edge/Chrome. If `PDF_BROWSER_PATH` is not set, the backend tries common Windows install paths.
+PDF generation:
+- On **Windows**: Uses headless Edge/Chrome via executables. If `PDF_BROWSER_PATH` is not set, the backend tries common Windows install paths.
+- On **Linux/Render**: Uses [Puppeteer](https://pptr.dev/) to control a headless Chromium browser automatically.
 
 ## Main Files
 
@@ -223,7 +225,9 @@ Flow:
 2. `materials.js` extracts and validates JSON.
 3. Backend normalizes/falls back missing one-pager fields.
 4. Backend renders a deterministic A4 HTML template.
-5. Headless Edge/Chrome writes PDF via `--print-to-pdf`.
+5. PDF conversion:
+   - **Windows**: Headless Edge/Chrome writes PDF via `--print-to-pdf`
+   - **Linux/Render**: Puppeteer controls headless Chromium to generate PDF
 6. Endpoint returns:
 
 ```http
@@ -231,11 +235,10 @@ Content-Type: application/pdf
 Content-Disposition: attachment; filename="renovace-svj-onepager.pdf"
 ```
 
-If no browser is found:
+Error scenarios:
 
-```text
-No PDF browser found. Set PDF_BROWSER_PATH to msedge.exe or chrome.exe.
-```
+- Windows without browser: `No PDF browser found. Set PDF_BROWSER_PATH to msedge.exe or chrome.exe.`
+- Linux without Puppeteer dependency: Install via `npm install puppeteer` at root level
 
 ## External Services
 

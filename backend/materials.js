@@ -1,6 +1,6 @@
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { tmpdir } from "node:os";
+import { tmpdir, platform } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -483,7 +483,7 @@ async function findPdfBrowser() {
   throw new Error("No PDF browser found. Set PDF_BROWSER_PATH to msedge.exe or chrome.exe.");
 }
 
-async function htmlToPdf(html) {
+async function htmlToPdfWithBrowser(html) {
   const workDir = await mkdtemp(join(tmpdir(), "renovuj-pdf-"));
   const htmlPath = join(workDir, "onepager.html");
   const pdfPath = join(workDir, "onepager.pdf");
@@ -508,6 +508,31 @@ async function htmlToPdf(html) {
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
+}
+
+async function htmlToPdfWithPuppeteer(html) {
+  let browser;
+  try {
+    const puppeteer = (await import("puppeteer")).default;
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    return await page.pdf({ format: "A4", margin: { top: 0, right: 0, bottom: 0, left: 0 } });
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
+
+async function htmlToPdf(html) {
+  if (platform() === "linux") {
+    return htmlToPdfWithPuppeteer(html);
+  }
+  return htmlToPdfWithBrowser(html);
 }
 
 export async function generateHoaOnePagerPdf(payload) {
