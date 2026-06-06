@@ -854,7 +854,7 @@ function LandingPage() {
           onContinue={() => transitionTo("summary")}
         />
       ) : step === "summary" ? (
-        <SummaryStep buildingInfo={buildingInfo} onContinue={() => transitionTo("financials")} />
+        <SummaryStep buildingInfo={buildingInfo} answers={answers} onContinue={() => transitionTo("financials")} />
       ) : step === "financials" ? (
         <FinancialsStep
           calculation={calculation}
@@ -872,25 +872,6 @@ function LandingPage() {
           isLoadingCommunity={isLoadingCommunity}
           communityError={communityError}
           onContinue={() => transitionTo("stakeholders")}
-        />
-      ) : step === "stakeholders" ? (
-        <StakeholderStep
-          selectedPersonas={selectedPersonas}
-          setSelectedPersonas={setSelectedPersonas}
-          customPersonas={customPersonas}
-          setCustomPersonas={setCustomPersonas}
-          onContinue={() => transitionTo("distribution")}
-        />
-      ) : step === "distribution" ? (
-        <DistributionStep
-          address={address}
-          buildingInfo={buildingInfo}
-          selected={selected}
-          answers={answers}
-          calculationInput={calculationInput}
-          calculation={calculation}
-          communityData={communityData}
-          selectedPersonas={selectedPersonas}
         />
       ) : (
         <div key={step} className={exiting ? "animate-blur-out" : "animate-blur-in"}>
@@ -1286,7 +1267,7 @@ function formatBuildingAddress(info: BuildingInfo | null) {
     address?.zip ? `PSC ${address.zip}` : null,
   ].filter(Boolean);
 
-  return parts.length > 0 ? parts.join(", ") : INFERRED_PROPERTY.address;
+  return parts.length > 0 ? parts.join(", ") : "Not available";
 }
 
 function valueOrFallback(value: unknown, fallback: string) {
@@ -1360,7 +1341,7 @@ function buildSummaryGroups(info: BuildingInfo | null): {
     {
       title: "History",
       items: [
-        { label: "Last renovation", value: p.lastRenovation },
+//         { label: "Last renovation", value: p.lastRenovation },
         { label: "Energy class", value: p.energyClass, accent: true },
       ],
     },
@@ -1369,9 +1350,11 @@ function buildSummaryGroups(info: BuildingInfo | null): {
 
 function SummaryStep({
   buildingInfo,
+  answers,
   onContinue,
 }: {
   buildingInfo: BuildingInfo | null;
+  answers: Record<string, string>;
   onContinue: () => void;
 }) {
   const groups = buildSummaryGroups(buildingInfo);
@@ -1522,7 +1505,7 @@ function FinancialsStep({
             color: "hsl(150 55% 42%)",
           },
           {
-            label: `NZU interest-free loan (${calculation.stateLoanTermYears} yr, 0%)`,
+            label: `NZÚ interest-free loan (${calculation.stateLoanTermYears} yr, 0%)`,
             pct:
               calculation.grossCapEx > 0
                 ? Math.round((calculation.netStateLoanAmount / calculation.grossCapEx) * 100)
@@ -1578,8 +1561,6 @@ function FinancialsStep({
     }
   };
 
-  const fmtCZK = (n: number) => new Intl.NumberFormat("cs-CZ").format(n).replace(/\u00A0/g, " ");
-
   const chatOpen = Boolean(asked || thinking || aiReply);
 
   const closeChat = () => {
@@ -1587,6 +1568,10 @@ function FinancialsStep({
     setAiReply(null);
     setThinking(false);
   };
+
+  const fmtCZK = (n: number) => new Intl.NumberFormat("cs-CZ").format(n).replace(/\u00A0/g, " ");
+
+  const chatOpenLabel = chatOpen ? "AI chat is open" : "AI chat is closed";
 
   return (
     <section className="relative min-h-screen w-full">
@@ -2005,7 +1990,7 @@ function UrgencyStep({
       <AiPortal>
         <aside
           className={[
-            "fixed top-[42%] left-[5%] z-30 hidden w-[40%] max-w-[500px] -translate-y-1/2 pointer-events-none lg:block",
+            "fixed top-[42%] left-[5%] z-30 hidden w-[40%] max-w-[500px] -translate-y-1/2 lg:block",
             "transition-[filter,transform,opacity] duration-500 ease-out",
             chatOpen ? "scale-[0.99] opacity-80 blur-md" : "scale-100 opacity-100 blur-0",
           ].join(" ")}
@@ -2359,51 +2344,51 @@ const PRAGUE_CENTER: [number, number] = [50.0875, 14.4214];
 
 const NEIGHBOURS = [
   {
-    address: "Jenštejnská 1966/1, Praha 2",
+    address: "Freyova 983/25, Praha 9",
     contact: "+420 776 112 305",
-    coords: [50.0759, 14.4271] as [number, number],
-    manager: "Petr Novák — Chair, SVJ Jenštejnská",
+    coords: [50.1053, 14.5021] as [number, number],
+    manager: "Petr Novák — Chair, SVJ Freyova",
     color: "hsl(15 80% 55%)",
   },
   {
-    address: "Křemencova 178/10, Praha 1",
+    address: "Kolbenova 942/38a, Praha 9",
     contact: "+420 602 884 217",
-    coords: [50.0808, 14.4187] as [number, number],
+    coords: [50.109, 14.5135] as [number, number],
     manager: "Markéta Dvořáková — Vice-chair",
     color: "hsl(45 90% 50%)",
   },
   {
-    address: "Vodičkova 710/31, Praha 1",
+    address: "Prosecká 815/71, Praha 9",
     contact: "+420 731 209 466",
-    coords: [50.0815, 14.4248] as [number, number],
+    coords: [50.12118, 14.5067] as [number, number],
     manager: "Tomáš Horák — Building manager",
     color: "hsl(150 60% 45%)",
   },
   {
-    address: "Štěpánská 615/24, Praha 1",
+    address: "U Vysočanského pivovaru 701/3, Praha 9",
     contact: "+420 605 991 028",
-    coords: [50.081, 14.4276] as [number, number],
-    manager: "Lucie Procházková — Chair, SVJ Štěpánská",
+    coords: [50.1089, 14.5046] as [number, number],
+    manager: "Lucie Procházková — Chair, SVJ U Vysočanského pivovaru",
     color: "hsl(200 70% 55%)",
   },
   {
-    address: "Sokolská 1802/32, Praha 2",
+    address: "Lovosická 440/40, Praha 9",
     contact: "+420 724 558 113",
-    coords: [50.0768, 14.4297] as [number, number],
+    coords: [50.123, 14.4848] as [number, number],
     manager: "Jan Veselý — Treasurer",
     color: "hsl(270 60% 60%)",
   },
   {
-    address: "Truhlářská 1108/13, Praha 1",
+    address: "Českomoravská 240/1a, Praha 9",
     contact: "+420 608 410 772",
-    coords: [50.0892, 14.4309] as [number, number],
+    coords: [50.104, 14.5006] as [number, number],
     manager: "Eva Kratochvílová — Chair",
     color: "hsl(330 70% 55%)",
   },
   {
-    address: "Klimentská 1216/46, Praha 1",
+    address: "Vysočanská 382/20, Praha 9",
     contact: "+420 777 304 188",
-    coords: [50.0918, 14.4326] as [number, number],
+    coords: [50.1124, 14.4898] as [number, number],
     manager: "Adam Beneš — Building manager",
     color: "hsl(180 70% 45%)",
   },
@@ -2594,7 +2579,7 @@ function CommunityStep({
       <AiPortal>
         <aside
           className={[
-            "fixed top-[42%] left-[5%] z-30 hidden w-[40%] max-w-[520px] -translate-y-1/2 lg:block",
+            "fixed top-[42%] left-[20%] z-30 hidden w-[40%] max-w-[520px] -translate-y-1/2 lg:block",
             "transition-[filter,transform,opacity] duration-500 ease-out",
             chatOpen ? "scale-[0.99] opacity-80 blur-md" : "scale-100 opacity-100 blur-0",
           ].join(" ")}
@@ -2643,7 +2628,11 @@ function CommunityStep({
                   ? communityError
                   : communityData
                     ? communityData.mode === "same-city"
-                      ? `${communityData.localCount} examples found in ${communityData.municipalityName}.`
+                      ? (
+                          <span className="font-medium text-green-600 dark:text-green-400">
+                            {`${communityData.localCount} examples found in ${communityData.municipalityName}.`}
+                          </span>
+                        )
                       : `No exact local set found for ${communityData.municipalityName}; showing strongest fallback examples.`
                     : "Local proof will load after the address is resolved."}
             </div>
@@ -2768,7 +2757,7 @@ function CommunityStep({
               type="text"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="How many properties were renovated in Prague this year?"
+              placeholder="How exactly does the interest-free NZÚ loan work?"
               className="h-11 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/80 focus:outline-none"
               aria-label="Ask AI"
             />
@@ -3183,7 +3172,7 @@ function StakeholderStep({
                 type="button"
                 onClick={() => setOpenId(null)}
                 aria-label="Close"
-                className="absolute -right-3 -top-3 grid h-10 w-10 place-items-center rounded-full border border-white/50 bg-background/70 text-foreground shadow-[0_10px_30px_-10px_rgba(0,0,0,0.3)] backdrop-blur-xl transition hover:scale-[1.06] active:scale-95"
+                className="absolute -right-3 -top-3 grid h-10 w-10 place-items-center rounded-full border border-white/50 bg-background/70 text-foreground shadow-[0_10px_30px_-10px_rgba(0,0,0,0.3)] backdrop-blur-xl transition hover:scale-[1.06] hover:bg-background/80 active:scale-95"
               >
                 <X className="h-4 w-4" />
               </button>

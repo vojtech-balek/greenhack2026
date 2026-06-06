@@ -1,0 +1,2 @@
+The New Neighbour:
+Use welcoming, transparent language. Assume this owner is open to renovation but does not yet understand the building's informal politics. Give them concise meeting language, a safe first speaking role, and concrete local proof so they can support the proposal without sounding naive or confrontational. Avoid insider jargon and do not pressure them into becoming the main organizer.
