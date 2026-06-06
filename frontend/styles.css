@@ -264,7 +264,8 @@ input {
 .renovation-section,
 .house-info-section,
 .impact-section,
-.community-section {
+.community-section,
+.personas-section {
   min-height: 100vh;
   scroll-margin-top: 0;
   padding: 92px 24px 110px;
@@ -653,6 +654,74 @@ input {
   white-space: nowrap;
 }
 
+.persona-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(16px, 2.2vw, 28px);
+  margin-top: 38px;
+}
+
+.persona-card {
+  min-width: 0;
+}
+
+.persona-image {
+  aspect-ratio: 4 / 5;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 26%, rgba(47, 95, 85, 0.22), transparent 16%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(241, 238, 233, 0.9));
+  border: 1px solid var(--line);
+}
+
+.persona-image::before,
+.persona-image::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  background: rgba(47, 95, 85, 0.34);
+  transform: translateX(-50%);
+}
+
+.persona-image::before {
+  width: 34%;
+  aspect-ratio: 1;
+  top: 18%;
+  border-radius: 999px;
+}
+
+.persona-image::after {
+  width: 58%;
+  height: 34%;
+  bottom: 16%;
+  border-radius: 999px 999px 0 0;
+}
+
+.persona-card h3 {
+  margin: 18px 0 0;
+  font-size: clamp(20px, 2vw, 30px);
+  line-height: 1.05;
+}
+
+.persona-card span {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.persona-card p {
+  margin: 12px 0 0;
+  color: #706d69;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .building-card {
   margin-top: 28px;
   overflow: hidden;
@@ -884,7 +953,8 @@ input {
   .renovation-section,
   .house-info-section,
   .impact-section,
-  .community-section {
+  .community-section,
+  .personas-section {
     padding: 72px 16px 82px;
   }
 
@@ -961,6 +1031,32 @@ input {
     grid-column: 1;
     grid-row: auto;
     white-space: normal;
+  }
+
+  .persona-strip {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+
+  .persona-card {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 0 18px;
+    align-items: start;
+  }
+
+  .persona-image {
+    grid-row: span 3;
+  }
+
+  .persona-card h3,
+  .persona-card span,
+  .persona-card p {
+    grid-column: 2;
+  }
+
+  .persona-card h3 {
+    margin-top: 0;
   }
 
   .scope-grid {
