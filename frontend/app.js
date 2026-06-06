@@ -1065,7 +1065,24 @@ function buildMaterialPayload(format) {
 
 async function generateMaterial(format, button) {
   if (format === "pdf") {
-    await generatePdf(button);
+    await generatePdf(button, {
+      endpoint: "/api/generate-pdf",
+      filename: "renovace-svj-onepager.pdf",
+      readyMessage: "PDF bylo staženo jako renovace-svj-onepager.pdf.",
+      loadingMessage: "Připravuji A4 podklad pro schůzi SVJ...",
+      label: "Generuji PDF",
+    });
+    return;
+  }
+
+  if (format === "leaflet") {
+    await generatePdf(button, {
+      endpoint: "/api/generate-leaflet",
+      filename: "renovace-svj-letak.pdf",
+      readyMessage: "Leták byl stažen jako renovace-svj-letak.pdf.",
+      loadingMessage: "Připravuji A4 leták na nástěnku...",
+      label: "Generuji leták",
+    });
     return;
   }
 
@@ -1102,21 +1119,21 @@ async function generateMaterial(format, button) {
   }
 }
 
-async function generatePdf(button) {
+async function generatePdf(button, options) {
   const originalLabel = button.innerHTML;
   button.disabled = true;
-  button.textContent = "Generuji PDF...";
+  button.textContent = options.label;
   materialOutput.hidden = false;
-  materialOutputLabel.textContent = "Generuji PDF";
-  materialOutputText.textContent = "Připravuji A4 podklad pro schůzi SVJ...";
+  materialOutputLabel.textContent = options.label;
+  materialOutputText.textContent = options.loadingMessage;
 
   try {
-    const response = await fetch("/api/generate-pdf", {
+    const response = await fetch(options.endpoint, {
       method: "POST",
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify(buildMaterialPayload("pdf")),
+      body: JSON.stringify(buildMaterialPayload(options.endpoint === "/api/generate-leaflet" ? "leaflet" : "pdf")),
     });
 
     if (!response.ok) {
@@ -1128,14 +1145,14 @@ async function generatePdf(button) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "renovace-svj-onepager.pdf";
+    link.download = options.filename;
     document.body.append(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
 
-    materialOutputLabel.textContent = "PDF připraveno";
-    materialOutputText.textContent = "PDF bylo staženo jako renovace-svj-onepager.pdf.";
+    materialOutputLabel.textContent = "Soubor připraven";
+    materialOutputText.textContent = options.readyMessage;
   } catch (error) {
     materialOutputLabel.textContent = "Generování PDF selhalo";
     materialOutputText.textContent = error.message;

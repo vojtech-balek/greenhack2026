@@ -3,20 +3,26 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  generateHallLeafletPdf,
   generateHoaOnePagerPdf,
   generatePersuasionMaterial,
   loadMaterialGeneratorConfig,
   setMaterialGeneratorConfig,
 } from "./materials.js";
+import { loadEnv as loadAdvisorEnv, runAdvisorPipeline } from "./advisorPipeline.js";
 import { calculateNzuRenovation } from "./nzuCalculator.js";
 
 const rootDir = fileURLToPath(new URL("..", import.meta.url));
 const frontendDir = join(rootDir, "frontend");
+const newAppClientDir = join(rootDir, "new_app", "dist", "client");
+const newAppServerPath = join(rootDir, "new_app", "dist", "server", "server.js");
+const newAppSrcImgDir = join(rootDir, "new_app", "src", "img");
 const backendImgDir = join(rootDir, "backend", "img");
 const constructionCodelistPath = join(rootDir, "backend", "data", "CE_DRUH_KONSTRUKCE.csv");
 const reconstructionCsvPath = join(rootDir, "backend", "data", "reconstructions", "sfzp_aktivni_IS.csv");
 const reconstructionPreparedPath = join(rootDir, "backend", "data", "reconstructions", "sfzp_hoa_geocoded.json");
 const port = Number.parseInt(process.env.PORT || "3000", 10);
+let newAppServerPromise;
 
 async function loadDotEnv(filePath) {
   try {
@@ -59,6 +65,7 @@ const dotEnv = await loadDotEnv(join(rootDir, ".env"));
 const ruianApiKey = process.env.RUIAN_API_KEY || dotEnv.RUIAN_API_KEY || "";
 const materialGeneratorConfig = await loadMaterialGeneratorConfig({ ...dotEnv, ...process.env });
 setMaterialGeneratorConfig(materialGeneratorConfig);
+loadAdvisorEnv();
 const buildingAttributeFields = [
   "kod",
   "typstavebnihoobjektukod",
@@ -81,6 +88,7 @@ const mimeTypes = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
@@ -859,6 +867,121 @@ function resolveImagePath(urlPath) {
   return resolvedPath;
 }
 
+function resolveNewAppClientPath(urlPath) {
+  if (!urlPath.startsWith("/assets/")) {
+    return null;
+  }
+
+  const resolvedPath = normalize(join(newAppClientDir, urlPath));
+
+  if (!resolvedPath.startsWith(newAppClientDir)) {
+    return null;
+  }
+
+  return resolvedPath;
+}
+
+function resolveNewAppJsonAssetPath(urlPath) {
+  if (!urlPath.startsWith("/__l5e/assets-v1/")) {
+    return null;
+  }
+
+  const filename = urlPath.split("/").pop();
+  const resolvedPath = normalize(join(newAppSrcImgDir, filename));
+
+  if (!filename || !resolvedPath.startsWith(newAppSrcImgDir)) {
+    return null;
+  }
+
+  return resolvedPath;
+}
+
+async function serveFile(response, filePath) {
+  const file = await readFile(filePath);
+  response.writeHead(200, {
+    "content-type": mimeTypes[extname(filePath)] || "application/octet-stream",
+  });
+  response.end(file);
+}
+
+async function serveNewAppClientAsset(urlPath, response) {
+  const filePath = resolveNewAppClientPath(urlPath);
+
+  if (!filePath) {
+    return false;
+  }
+
+  try {
+    await serveFile(response, filePath);
+  } catch {
+    json(response, 404, { error: "Not found" });
+  }
+
+  return true;
+}
+
+async function serveNewAppJsonAsset(urlPath, response) {
+  const filePath = resolveNewAppJsonAssetPath(urlPath);
+
+  if (!filePath) {
+    return false;
+  }
+
+  try {
+    await serveFile(response, filePath);
+  } catch {
+    json(response, 404, { error: "Not found" });
+  }
+
+  return true;
+}
+
+async function getNewAppServer() {
+  newAppServerPromise ??= import(`file://${newAppServerPath}`).then((module) => module.default);
+  return newAppServerPromise;
+}
+
+async function serveNewApp(request, response) {
+  try {
+    const app = await getNewAppServer();
+    if (!app?.fetch) {
+      return false;
+    }
+
+    const origin = `http://${request.headers.host}`;
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(request.headers)) {
+      if (Array.isArray(value)) {
+        value.forEach((entry) => headers.append(key, entry));
+      } else if (value !== undefined) {
+        headers.set(key, value);
+      }
+    }
+
+    const webRequest = new Request(new URL(request.url, origin), {
+      method: request.method,
+      headers,
+      body: request.method === "GET" || request.method === "HEAD" ? undefined : request,
+      duplex: request.method === "GET" || request.method === "HEAD" ? undefined : "half",
+    });
+    const webResponse = await app.fetch(webRequest, {}, {});
+
+    response.writeHead(webResponse.status, Object.fromEntries(webResponse.headers.entries()));
+    if (webResponse.body) {
+      for await (const chunk of webResponse.body) {
+        response.write(chunk);
+      }
+    }
+    response.end();
+    return true;
+  } catch (error) {
+    if (error?.code !== "ERR_MODULE_NOT_FOUND" && error?.code !== "ENOENT") {
+      console.error(error);
+    }
+    return false;
+  }
+}
+
 async function serveStatic(request, response) {
   const url = new URL(request.url, `http://${request.headers.host}`);
   const filePath = resolveImagePath(url.pathname) || resolveStaticPath(url.pathname);
@@ -869,11 +992,7 @@ async function serveStatic(request, response) {
   }
 
   try {
-    const file = await readFile(filePath);
-    response.writeHead(200, {
-      "content-type": mimeTypes[extname(filePath)] || "application/octet-stream",
-    });
-    response.end(file);
+    await serveFile(response, filePath);
   } catch {
     json(response, 404, { error: "Not found" });
   }
@@ -949,6 +1068,29 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (url.pathname === "/api/advisor" && request.method === "POST") {
+    try {
+      const body = await readJsonBody(request);
+      const question = `${body.question || ""}`.trim();
+
+      if (!question) {
+        json(response, 400, { error: "Question is required." });
+        return;
+      }
+
+      const context = body.context ? `\n\nCurrent app context:\n${JSON.stringify(body.context, null, 2)}` : "";
+      const answer = await runAdvisorPipeline(`${question}${context}`);
+      json(response, 200, {
+        answer,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      json(response, 400, { error: error.message || "Advisor failed." });
+    }
+
+    return;
+  }
+
   if (url.pathname === "/api/generate-material" && request.method === "POST") {
     try {
       const body = await readJsonBody(request);
@@ -979,6 +1121,39 @@ const server = createServer(async (request, response) => {
       json(response, 400, { error: error.message || "Nepodařilo se vygenerovat PDF." });
     }
 
+    return;
+  }
+
+  if (url.pathname === "/api/generate-leaflet" && request.method === "POST") {
+    try {
+      const body = await readJsonBody(request);
+      const pdf = await generateHallLeafletPdf(body);
+      response.writeHead(200, {
+        "content-type": "application/pdf",
+        "content-disposition": 'attachment; filename="renovace-svj-letak.pdf"',
+        "access-control-allow-origin": "*",
+      });
+      response.end(pdf);
+    } catch (error) {
+      json(response, 400, { error: error.message || "Nepodařilo se vygenerovat leták." });
+    }
+
+    return;
+  }
+
+  if (await serveNewAppClientAsset(url.pathname, response)) {
+    return;
+  }
+
+  if (await serveNewAppJsonAsset(url.pathname, response)) {
+    return;
+  }
+
+  if (
+    !url.pathname.startsWith("/img/") &&
+    !url.pathname.startsWith("/__l5e/assets-v1/") &&
+    (await serveNewApp(request, response))
+  ) {
     return;
   }
 

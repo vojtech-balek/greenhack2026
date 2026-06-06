@@ -238,7 +238,6 @@ Payload:
 Generates text output for:
 
 - `format: "whatsapp"`
-- `format: "leaflet"`
 
 Returns:
 
@@ -259,6 +258,17 @@ Returns:
 ```http
 Content-Type: application/pdf
 Content-Disposition: attachment; filename="renovace-svj-onepager.pdf"
+```
+
+### `POST /api/generate-leaflet`
+
+Generates binary A4 PDF leaflet for a notice board, hallway, or elevator.
+
+Returns:
+
+```http
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="renovace-svj-letak.pdf"
 ```
 
 ## Error Shape

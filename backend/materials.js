@@ -1,4 +1,4 @@
-﻿import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,12 +15,14 @@ export async function loadMaterialGeneratorConfig(env = process.env) {
     pdf: await readFile(join(promptsDir, "material-pdf-json.md"), "utf8"),
     whatsapp: await readFile(join(promptsDir, "material-whatsapp.md"), "utf8"),
     leaflet: await readFile(join(promptsDir, "material-leaflet.md"), "utf8"),
+    leafletJson: await readFile(join(promptsDir, "material-leaflet-json.md"), "utf8"),
     personas: {
       opatrna: await readFile(join(promptsDir, "personas", "opatrna.md"), "utf8"),
       kalkulacka: await readFile(join(promptsDir, "personas", "kalkulacka.md"), "utf8"),
       zitrek: await readFile(join(promptsDir, "personas", "zitrek.md"), "utf8"),
       neduverivy: await readFile(join(promptsDir, "personas", "neduverivy.md"), "utf8"),
       inzenyr: await readFile(join(promptsDir, "personas", "inzenyr.md"), "utf8"),
+      newcomer: await readFile(join(promptsDir, "personas", "newcomer.md"), "utf8"),
     },
   };
 
@@ -220,6 +222,41 @@ function normalizeOnePager(value, payload) {
   };
 }
 
+function normalizeLeaflet(value, payload) {
+  const calculation = payload.context?.calculation?.result || {};
+  const nonFinancialBenefits = payload.context?.nonFinancialBenefits || [
+    "Dům bude pohodlnější v zimě i v létě.",
+    "Méně průvanu, vlhkosti a neplánovaných oprav.",
+  ];
+  const fallbackNumbers = [
+    { label: "Cena čekání", value: formatCurrencyPlain(calculation.totalWaitPenalty) },
+    { label: "Roční úspora", value: formatCurrencyPlain(calculation.estimatedYearlySavings) },
+    { label: "0% splátka", value: `${formatCurrencyPlain(calculation.monthlyStateLoanPayment)} / měsíc` },
+  ];
+  const bigNumbers = (Array.isArray(value.bigNumbers) && value.bigNumbers.length ? value.bigNumbers : fallbackNumbers)
+    .slice(0, 3)
+    .map((item, index) => ({
+      label: String(item.label || fallbackNumbers[index]?.label || "").trim(),
+      value: String(item.value || fallbackNumbers[index]?.value || "").trim(),
+    }));
+  const body = arrayOfStrings(value.body).slice(0, 5);
+  const hasNonFinancialBenefit = body.join(" ").match(/komfort|teplot|vlhk|hluk|vzduch|vzhled|havári|opravy|zdrav|pohodl/i);
+
+  if (!hasNonFinancialBenefit) {
+    body.push(nonFinancialBenefits[0]);
+  }
+
+  return {
+    headline: String(value.headline || "Renovaci je výhodné řešit teď").trim(),
+    subheadline: String(value.subheadline || "Krátký podklad pro vlastníky bytů v našem domě.").trim(),
+    bigNumbers,
+    body: body.length ? body : nonFinancialBenefits.slice(0, 3),
+    callToAction: String(
+      value.callToAction || "Nezávazně ověřme možnosti financování a připravme podklady pro rozhodnutí SVJ.",
+    ).trim(),
+  };
+}
+
 function formatCurrencyPlain(value) {
   const number = Number(value) || 0;
   return new Intl.NumberFormat("cs-CZ", {
@@ -359,6 +396,66 @@ function renderOnePagerHtml(onePager, payload) {
 </html>`;
 }
 
+function renderLeafletHtml(leaflet, payload) {
+  const address = payload.context?.address || {};
+  const goals = payload.context?.selectedGoals || [];
+  const locationText = [address.municipalityName, address.streetName, address.cp ? `č.p. ${address.cp}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  const goalsText = goals.map((goal) => goal.label).filter(Boolean).join(", ") || "renovace domu";
+
+  return `<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f6f4ef; color: #171717; font-family: Arial, sans-serif; }
+    .page { width: 210mm; height: 297mm; padding: 17mm; display: grid; grid-template-rows: auto auto 1fr auto; gap: 11mm; }
+    .kicker { margin: 0 0 5mm; color: #2f5f55; font-size: 11pt; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+    h1 { max-width: 178mm; margin: 0; font-size: 44pt; line-height: .92; letter-spacing: -.04em; }
+    .sub { max-width: 174mm; margin: 7mm 0 0; color: #5f5b57; font-size: 17pt; font-weight: 700; line-height: 1.15; }
+    .meta { margin: 4mm 0 0; color: #7a756f; font-size: 9pt; }
+    .numbers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+    .number { min-height: 39mm; padding: 5mm; background: #fff; border: 1px solid #e2ddd5; }
+    .number span { display: block; color: #706d69; font-size: 9pt; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
+    .number strong { display: block; margin-top: 6mm; color: #2f5f55; font-size: 22pt; line-height: .95; }
+    .body { display: grid; gap: 4mm; align-content: start; }
+    .body p { margin: 0; padding: 5mm; background: rgba(255,255,255,.74); border: 1px solid #e2ddd5; font-size: 16pt; font-weight: 700; line-height: 1.18; }
+    .cta { padding: 7mm; background: #171717; color: #fff; }
+    .cta p { margin: 0; font-size: 22pt; font-weight: 800; line-height: 1.05; }
+    .foot { margin-top: 4mm; color: rgba(255,255,255,.62); font-size: 9pt; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <p class="kicker">Informace pro vlastníky bytů</p>
+      <h1>${escapeHtml(leaflet.headline)}</h1>
+      <p class="sub">${escapeHtml(leaflet.subheadline)}</p>
+      <p class="meta">${escapeHtml(locationText)} · ${escapeHtml(goalsText)}</p>
+    </header>
+    <section class="numbers">
+      ${leaflet.bigNumbers
+        .map(
+          (item) =>
+            `<article class="number"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></article>`,
+        )
+        .join("")}
+    </section>
+    <section class="body">
+      ${leaflet.body.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
+    </section>
+    <footer class="cta">
+      <p>${escapeHtml(leaflet.callToAction)}</p>
+      <div class="foot">Orientační podklad podle dostupných údajů o domě a vybraných opatřeních.</div>
+    </footer>
+  </main>
+</body>
+</html>`;
+}
+
 async function pathExists(filePath) {
   try {
     await access(filePath);
@@ -417,6 +514,14 @@ export async function generateHoaOnePagerPdf(payload) {
   const text = await callEInfra(makeMaterialPrompt({ ...payload, format: "pdf" }), 0.1);
   const onePager = normalizeOnePager(extractJsonObject(text), payload);
   const html = renderOnePagerHtml(onePager, payload);
+  return htmlToPdf(html);
+}
+
+export async function generateHallLeafletPdf(payload) {
+  const prompt = makeMaterialPrompt({ ...payload, format: "leafletJson" });
+  const text = await callEInfra(prompt, 0.1);
+  const leaflet = normalizeLeaflet(extractJsonObject(text), payload);
+  const html = renderLeafletHtml(leaflet, payload);
   return htmlToPdf(html);
 }
 

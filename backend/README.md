@@ -85,6 +85,7 @@ Primary endpoints:
 - `POST /api/calculate-renovation`
 - `POST /api/generate-material`
 - `POST /api/generate-pdf`
+- `POST /api/generate-leaflet`
 
 API routes include permissive CORS headers for hackathon/dev use:
 
@@ -110,6 +111,7 @@ Typical frontend flow:
 6. Build material payload and call:
    - `POST /api/generate-material`
    - or `POST /api/generate-pdf`
+   - or `POST /api/generate-leaflet`
 
 ## NZÚ Calculator
 
@@ -176,11 +178,11 @@ generateHoaOnePagerPdf(payload)
 Text material:
 
 - `format: "whatsapp"`
-- `format: "leaflet"`
 
 PDF material:
 
 - `POST /api/generate-pdf`
+- `POST /api/generate-leaflet`
 - LLM returns strict JSON for copy content.
 - Backend renders deterministic A4 HTML.
 - Headless browser prints binary PDF.
@@ -252,7 +254,8 @@ A new frontend should treat the backend as an API service:
 - Build the material payload using `API.md`.
 - Use `/api/calculate-renovation` instead of duplicating financial logic.
 - Use `/api/generate-pdf` for a binary A4 handout.
-- Use `/api/generate-material` for chat or leaflet text.
+- Use `/api/generate-leaflet` for a binary A4 notice-board leaflet.
+- Use `/api/generate-material` for chat text.
 - Send selected/custom personas as data; backend owns prompt interpretation.
 
 ## Known Prototype Limitations

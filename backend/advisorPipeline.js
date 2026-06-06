@@ -4,7 +4,10 @@
  * for website backends (Express, Next.js API routes, etc.).
  */
 
-const https = require('https');
+import https from "node:https";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // 1. Embedded Golden System Prompt
 const GOLDEN_SYSTEM_PROMPT = `You are the "Renovate Now" AI Expert Advisor, integrated into a Česká spořitelna digital application for the GreenHack 2026 challenge. Your purpose is to assist Czech apartment building owners, Homeowners' Associations (SVJ), and Housing Cooperatives (BD) in navigating the early phases of energy renovation.
@@ -14,7 +17,7 @@ const GOLDEN_SYSTEM_PROMPT = `You are the "Renovate Now" AI Expert Advisor, inte
 
 [YOUR IDENTITY & TONE]
 - Speak in clear, plain, accessible English. Avoid hyper-technical jargon.
-- Be empathetic, highly encouraging, and grounding. 
+- Be empathetic, highly encouraging, and grounding.
 - De-escalate decision paralysis and anxiety with concrete legal and financial facts.
 - Align subtly with the public interest and business goals of Česká spořitelna (guiding the user towards a pre-approved commercial/subsidy financing frame).
 
@@ -27,16 +30,17 @@ const GOLDEN_SYSTEM_PROMPT = `You are the "Renovate Now" AI Expert Advisor, inte
 [GUARDRAILS & ANSWERING RULES]
 - If the user asks a question requiring real-world local data (e.g., local addresses, specific contractor details, current market pricing), rely on the provided Google Search results snippet.
 - NEVER hallucinate numerical values, exact interest rates, or legislative articles. If you do not have the data in your context or search snippets, say: "I don't have the exact figure for that block or policy right now, but a Česká spořitelna specialist will verify this precisely for your building during your free consultation."
+- Return concise answers, 1 paragraph, up to 3 sentences.
 `;
 
 /**
  * Loads environment variables manually from a .env file.
  */
 function loadEnv() {
-  const envPath = require('path').resolve(process.cwd(), '.env');
+  const envPath = path.resolve(process.cwd(), '.env');
   try {
-    if (require('fs').existsSync(envPath)) {
-      const content = require('fs').readFileSync(envPath, 'utf8');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
       content.split('\n').forEach((line) => {
         const trimmed = line.trim();
         if (trimmed && !trimmed.startsWith('#')) {
@@ -247,15 +251,11 @@ async function runAdvisorPipeline(userQuery, systemPrompt = null) {
   return await callLocalLLM(formattedMessages, llmUrl, llmKey, llmModel, llmTemp);
 }
 
-// Module exports
-module.exports = {
-  loadEnv,
-  runAdvisorPipeline,
-  GOLDEN_SYSTEM_PROMPT
-};
+export { loadEnv, runAdvisorPipeline, GOLDEN_SYSTEM_PROMPT };
 
 // Simple CLI test harness if run directly
-if (require.main === module) {
+const isCli = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+if (isCli) {
   (async () => {
     loadEnv();
     console.log('--- Renovate Now Node.js Advisor CLI ---');
