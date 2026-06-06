@@ -1,25 +1,76 @@
 # Backend API
 
-Backend is frontend-agnostic. Any UI can call these JSON endpoints.
+Backend is frontend-agnostic. Any UI can call these endpoints.
 
 API routes send permissive CORS headers for hackathon/dev use, so a separate frontend dev server can call this backend directly.
 
+Base URL in local development:
+
+```text
+http://localhost:3000
+```
+
+## Health
+
+### `GET /api/health`
+
+Returns:
+```json
+{
+  "ok": true,
+  "service": "renovuj.me"
+}
+```
+
+### `GET /api/site-status`
+
+Returns lightweight status metadata.
+
 ## Address + Building
 
-`GET /api/address-search?q=<query>`
+### `GET /api/address-search?q=<query>`
 
 Returns candidate Czech addresses from OpenStreetMap/Nominatim.
 
-`POST /api/building-info`
+Example:
 
-Body:
+```http
+GET /api/address-search?q=Praha%20Vodi%C4%8Dkova%2018
+```
+
+Response shape:
+
+```json
+{
+  "query": "Praha Vodičkova 18",
+  "matches": [
+    {
+      "id": "...",
+      "displayName": "...",
+      "municipalityName": "Praha",
+      "street": "Vodičkova",
+      "cp": "18",
+      "zip": "11000",
+      "lat": "...",
+      "lon": "..."
+    }
+  ],
+  "attribution": "© OpenStreetMap contributors"
+}
+```
+
+### `POST /api/building-info`
+
+Body with free-text address:
+
 ```json
 {
   "address": "Praha, Vodičkova 18"
 }
 ```
 
-or:
+or body with selected address candidate:
+
 ```json
 {
   "selectedAddress": {
@@ -32,19 +83,62 @@ or:
 }
 ```
 
-Returns normalized address and RÚIAN building facts.
+Returns normalized address and RÚIAN building facts:
+
+```json
+{
+  "query": "...",
+  "lookup": {
+    "addressId": 123,
+    "buildingId": 456
+  },
+  "address": {
+    "municipalityName": "...",
+    "streetName": "...",
+    "cp": "...",
+    "zip": "..."
+  },
+  "building": {
+    "usage": "bytový dům",
+    "completedAt": "01.01.1980",
+    "builtAreaM2": 300,
+    "floorAreaM2": 1000,
+    "floors": 4,
+    "flats": 12,
+    "utilities": {
+      "heating": "..."
+    }
+  }
+}
+```
 
 ## Local Proof
 
-`GET /api/reconstruction-examples?municipalityName=<name>`
+### `GET /api/reconstruction-examples?municipalityName=<name>`
 
 Returns local/fallback SVJ reconstruction examples and aggregate stats.
 
-## Materials
+Response shape:
 
-`POST /api/calculate-renovation`
+```json
+{
+  "municipalityName": "Praha",
+  "mode": "same-city",
+  "localCount": 3,
+  "totalCount": 100,
+  "stats": {},
+  "examples": []
+}
+```
 
-Runs deterministic NZÚ calculation. Body:
+## Calculation
+
+### `POST /api/calculate-renovation`
+
+Runs deterministic NZÚ calculation.
+
+Body:
+
 ```json
 {
   "floorArea": 1000,
@@ -55,22 +149,64 @@ Runs deterministic NZÚ calculation. Body:
 }
 ```
 
-`POST /api/generate-material`
+Returns:
 
-Generates text output for `whatsapp` or `leaflet`.
+```json
+{
+  "grossCapEx": 5800000,
+  "directSubsidyVulnerable": 1160000,
+  "netStateLoanAmount": 4640000,
+  "monthlyStateLoanPayment": 15467,
+  "estimatedYearlySavings": 270000,
+  "penaltyLostSavings": 1462407,
+  "penaltyCapexInflation": 1602433,
+  "penaltyLostZeroInterest": 6905761,
+  "totalWaitPenalty": 9970601
+}
+```
 
-`POST /api/generate-pdf`
+Supported goals:
 
-Generates binary A4 one-pager PDF for HOA/SVJ meeting handout.
+```text
+INSULATION
+HEAT_SOURCE
+PHOTOVOLTAICS
+GREEN_ROOF
+VENTILATION
+```
 
-Expected payload shape:
+## Materials
+
+Both material endpoints expect the same context payload.
+
+Payload:
+
 ```json
 {
   "format": "pdf",
   "context": {
-    "address": {},
-    "building": {},
-    "selectedGoals": [],
+    "address": {
+      "input": "...",
+      "municipalityName": "...",
+      "streetName": "...",
+      "cp": "..."
+    },
+    "building": {
+      "usage": "bytový dům",
+      "completedAt": "...",
+      "floorAreaM2": 1000,
+      "builtAreaM2": 300,
+      "floors": 4,
+      "flats": 10,
+      "heating": "..."
+    },
+    "selectedGoals": [
+      {
+        "id": "zatepleni",
+        "label": "Zateplení",
+        "nzuGoal": "INSULATION"
+      }
+    ],
     "answeredQuestions": [],
     "nonFinancialBenefits": [],
     "calculation": {
@@ -81,7 +217,12 @@ Expected payload shape:
   },
   "selectedPersonas": [],
   "visuals": {
-    "penaltyBreakdown": []
+    "penaltyBreakdown": [
+      {
+        "label": "Dražší stavba",
+        "value": 1602433
+      }
+    ]
   },
   "localExamples": {
     "summary": {},
@@ -90,4 +231,46 @@ Expected payload shape:
 }
 ```
 
-Material generation internals live in `backend/materials.js`. Persona and format prompts live in `backend/prompts/`.
+### `POST /api/generate-material`
+
+Generates text output for:
+
+- `format: "whatsapp"`
+- `format: "leaflet"`
+
+Returns:
+
+```json
+{
+  "content": "...",
+  "model": "mini",
+  "generatedAt": "2026-06-06T00:00:00.000Z"
+}
+```
+
+### `POST /api/generate-pdf`
+
+Generates binary A4 one-pager PDF for HOA/SVJ meeting handout.
+
+Returns:
+
+```http
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="renovace-svj-onepager.pdf"
+```
+
+## Error Shape
+
+Errors return JSON:
+
+```json
+{
+  "error": "Human-readable message"
+}
+```
+
+## Internal Modules
+
+- Material generation internals live in `backend/materials.js`.
+- Deterministic financial logic lives in `backend/nzuCalculator.js`.
+- Persona and format prompts live in `backend/prompts/`.
