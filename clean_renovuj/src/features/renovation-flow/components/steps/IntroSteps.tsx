@@ -1,6 +1,7 @@
 import { GOALS } from "../../constants";
 import { buildingsAsset } from "../../model";
 import { StepShell } from "../shells";
+import { StepHeader } from "@/components/flow/primitives";
 export function HeroStep({
   address,
   setAddress,

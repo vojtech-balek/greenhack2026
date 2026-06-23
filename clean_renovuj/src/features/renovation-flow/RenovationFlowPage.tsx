@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import {
   AskAiProvider,
   AskAiBar,
@@ -84,6 +85,7 @@ export function RenovationFlowPage() {
   const [exiting, setExiting] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [selectedPersonaIds, setSelectedPersonaIds] = useState<Set<string>>(() => new Set());
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [energyFile, setEnergyFile] = useState<File | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -325,7 +327,7 @@ export function RenovationFlowPage() {
       maxStateLoanAmount: numberOfFlats * 750000,
       stateLoanTermYears: 25,
       monthlyStateLoanPayment: (numberOfFlats * 750000 - vulnerableFlats * 120000) / (25 * 12),
-      estimatedYearlySavings: floorArea * 450 * 0.5,
+      estimatedYearlySavings: floorArea * 500 * 0.5,
       penaltyLostSavings: floorArea * 450 * 0.5 * 5,
       penaltyCapexInflation: numberOfFlats * 750000 * 0.25,
       penaltyLostZeroInterest: numberOfFlats * 750000 * 0.1,
@@ -343,7 +345,9 @@ export function RenovationFlowPage() {
       "fairer support for vulnerable neighbours",
     ];
 
-    const mappedPersonas = PERSONAS.map((p) => ({
+    const selectedBuiltInPersonas = PERSONAS.filter((p) => selectedPersonaIds.has(p.id));
+    const personasForMaterials = selectedBuiltInPersonas.length > 0 ? selectedBuiltInPersonas : PERSONAS;
+    const mappedPersonas = personasForMaterials.map((p) => ({
       id: p.id === "penny" ? "neduverivy" : p.id === "absentee" ? "kalkulacka" : p.id === "newcomer" ? "newcomer" : p.id === "pensioner" ? "opatrna" : p.id === "skeptic" ? "inzenyr" : p.id,
       name: p.type,
       type: p.type,
@@ -552,7 +556,11 @@ export function RenovationFlowPage() {
       ) : step === "community" ? (
         <CommunityStep onContinue={() => transitionTo("stakeholders")} communityData={communityData} />
       ) : step === "stakeholders" ? (
-        <StakeholderStep onContinue={() => transitionTo("distribution")} />
+        <StakeholderStep
+          onContinue={() => transitionTo("distribution")}
+          selectedPersonaIds={selectedPersonaIds}
+          setSelectedPersonaIds={setSelectedPersonaIds}
+        />
       ) : step === "distribution" ? (
         <DistributionStep
           generatingId={generatingId}
@@ -1054,35 +1062,7 @@ function FinancialsStep({
 
 
             <div className="mt-10 space-y-6">
-              {/* Out-of-pocket — what each owner actually pays today */}
-              <article className="rounded-[28px] border border-border/60 bg-card/70 p-7">
-                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  What you pay today
-                </p>
 
-                <p className="mt-3 font-display text-[3.5rem] font-semibold leading-[1.05] tracking-[-0.04em] text-foreground">
-                  0 CZK <span className="text-foreground/40">/ flat</span>
-                </p>
-
-                {/* Crossed-out full cost → 0 */}
-                <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-                  <span className="text-muted-foreground">Full project cost</span>
-                  <span className="font-mono tabular-nums text-foreground/50 line-through decoration-[hsl(20_75%_50%)]/60 decoration-[1.5px]">
-                    {fmtCZK(f.totalProjectCost)} CZK
-                  </span>
-                  <span className="text-muted-foreground/60">→</span>
-                  <span className="rounded-md bg-[hsl(150_55%_42%/0.12)] px-2 py-0.5 font-mono text-sm font-semibold tabular-nums text-[hsl(150_55%_28%)]">
-                    0 CZK upfront
-                  </span>
-                </div>
-
-                <p className="mt-5 max-w-[55ch] text-sm leading-relaxed text-foreground/75">
-                  The NZU 2026+ interest-free loan (up to 750 000 CZK / flat) plus a small commercial top-up cover the full envelope. Nothing leaves your pocket on day one.
-                </p>
-                <p className="mt-3 text-xs italic text-muted-foreground/70">
-                  Sources: State Environmental Fund 2026 press release, novazelenausporam.cz, Brivo Vinohrady ~180 000 CZK/m² (Q1 2026).
-                </p>
-              </article>
 
               {/* Property value uplift — lead with the CZK gain per flat */}
               <article className="rounded-[28px] border border-border/60 bg-card/70 p-7">
@@ -1151,7 +1131,7 @@ function FinancialsStep({
                       Loan repayment
                     </p>
                     <p className="mt-2 font-display text-2xl font-semibold tabular-nums text-foreground">
-                      −{fmtCZK(f.monthly.loanRepayment)}
+                      -{fmtCZK(f.monthly.loanRepayment)}
                       <span className="ml-1 text-sm font-normal text-muted-foreground">CZK</span>
                     </p>
                   </div>
@@ -1174,7 +1154,7 @@ function FinancialsStep({
                 {/* Hand-noted net */}
                 <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
                   <span className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full bg-foreground px-4 font-display text-sm font-semibold text-background">
-                    Net +{fmtCZK(f.monthly.net)} CZK / mo
+                    Net -{fmtCZK(f.monthly.net)} CZK / mo
                   </span>
                   <span className="text-xs italic text-muted-foreground">
                     {f.monthly.note}
@@ -1718,21 +1698,6 @@ function CommunityStep({
     };
   }, [isLg]);
 
-  const focusNeighbour = async (i: number) => {
-    setActiveIdx(i);
-    const L = (await import("leaflet")).default;
-    const m = markersRef.current[i] as import("leaflet").Marker | undefined;
-    if (m) {
-      m.openPopup();
-      const ll = m.getLatLng();
-      // pan smoothly
-      // @ts-expect-error map is captured in init effect; use marker's map
-      const map = m._map as import("leaflet").Map | undefined;
-      if (map) map.setView(ll, Math.max(map.getZoom(), 15), { animate: true });
-    }
-    void L;
-  };
-
   return (
     <SplitShell
       leftFloating={
@@ -1762,7 +1727,7 @@ function CommunityStep({
             />
 
             {communityData && (
-              <div className="mt-6 grid grid-cols-3 gap-3 rounded-2xl border border-border/50 bg-card/45 p-4 text-center backdrop-blur-sm">
+              <div className="mt-6 grid grid-cols-[minmax(0,1fr)_minmax(max-content,1.6fr)] gap-3 rounded-2xl border border-border/50 bg-card/45 p-4 text-center backdrop-blur-sm">
                 <div>
                   <span className="block text-2xl font-bold tracking-tight text-foreground">
                     {communityData.stats?.totalApplicants || 0}
@@ -1770,16 +1735,10 @@ function CommunityStep({
                   <span className="text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground">Association applications</span>
                 </div>
                 <div>
-                  <span className="block text-2xl font-bold tracking-tight text-foreground">
-                    {fmtCZK(communityData.stats?.totalPaid || 0)}
+                  <span className="block whitespace-nowrap text-2xl font-bold tracking-tight text-foreground">
+                    {fmtCZK(communityData.stats?.totalPaid || 0)} CZK
                   </span>
                   <span className="text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground">total paid</span>
-                </div>
-                <div>
-                  <span className="block text-base font-bold tracking-tight text-[hsl(150_55%_30%)] capitalize py-1">
-                    {communityData.mode === "same-city" ? "Prague" : "All Czechia"}
-                  </span>
-                  <span className="text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground block">location</span>
                 </div>
               </div>
             )}
@@ -1792,9 +1751,17 @@ function CommunityStep({
                     <div key={i} className="rounded-2xl border border-border/60 bg-background/50 p-4 transition hover:border-foreground/20">
                       <div className="flex items-start justify-between gap-2">
                         <strong className="text-sm font-semibold text-foreground block">{ex.applicantAddress || ex.applicant}</strong>
-                        <span className="rounded-full bg-[hsl(150_55%_42%/0.12)] px-2.5 py-0.5 text-xs font-semibold text-[hsl(150_55%_30%)]">
-                          {fmtCZK(ex.support)} CZK
-                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="rounded-full bg-[hsl(150_55%_42%/0.12)] px-2.5 py-0.5 text-xs font-semibold text-[hsl(150_55%_30%)]">
+                            {fmtCZK(ex.support)} CZK
+                          </span>
+                          <button
+                            type="button"
+                            className="rounded-full border border-border/70 bg-background/60 px-3 py-1 text-xs font-semibold text-foreground/80 transition hover:border-foreground/25 hover:bg-background"
+                          >
+                            Contact
+                          </button>
+                        </div>
                       </div>
                       <p className="mt-1.5 text-xs text-muted-foreground">
                         {ex.municipalityName} · {ex.purpose} · {ex.signedAt}
@@ -1804,46 +1771,6 @@ function CommunityStep({
                 </div>
               </div>
             )}
-
-            {/* Contact list */}
-            <ul className="mt-6 space-y-2">
-              {NEIGHBOURS.map((n, i) => (
-                <li key={n.address}>
-                  <button
-                    type="button"
-                    onClick={() => focusNeighbour(i)}
-                    className={[
-                      "group flex w-full items-start gap-3 rounded-2xl border-2 px-4 py-3 text-left transition",
-                      activeIdx === i
-                        ? "bg-foreground/[0.04]"
-                        : "bg-background/40 hover:bg-foreground/[0.02]",
-                    ].join(" ")}
-                    style={{
-                      borderColor: activeIdx === i ? n.color : `${n.color}66`,
-                    }}
-                  >
-                    <span
-                      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_0_4px]"
-                      style={{
-                        backgroundColor: n.color,
-                        boxShadow: `0 0 0 4px ${n.color}30`,
-                      }}
-                    />
-                    <span className="flex-1">
-                      <span className="block font-display text-base font-semibold text-foreground">
-                        {n.address}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {n.manager}
-                      </span>
-                    </span>
-                    <span className="self-center font-mono text-sm tabular-nums text-foreground/85">
-                      {n.contact}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
 
             <ContinueRow onClick={onContinue} />
 
@@ -1971,15 +1898,15 @@ const PERSONAS: Persona[] = [
 ];
 
 
-const MOCK_CUSTOM_PERSONA: Omit<Persona, "id" | "sketch"> = {
-  type: "The Heritage Guardian",
-  adjectives: ["traditional", "detail-obsessed", "vocal"],
-  fear: "That any external insulation will ruin the original Vinohrady facade and trigger a heritage office dispute.",
-  description:
-    "Knows the building's protected-zone status by heart and will quote the heritage office rulebook in the meeting. Open to renovation only when historical detailing is preserved — cornices, window proportions, original plaster texture. Bring her the heritage office pre-consultation note and she becomes your most credible ally.",
-};
-
-function StakeholderStep({ onContinue }: { onContinue: () => void }) {
+function StakeholderStep({
+  onContinue,
+  selectedPersonaIds,
+  setSelectedPersonaIds,
+}: {
+  onContinue: () => void;
+  selectedPersonaIds: Set<string>;
+  setSelectedPersonaIds: Dispatch<SetStateAction<Set<string>>>;
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [custom, setCustom] = useState("");
   const [extraPersonas, setExtraPersonas] = useState<Persona[]>([]);
@@ -1993,6 +1920,14 @@ function StakeholderStep({ onContinue }: { onContinue: () => void }) {
   const personaOpen = Boolean(persona);
   const anyOverlay = chatOpen || personaOpen;
 
+  const togglePersona = (id: string) => {
+    setSelectedPersonaIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const submitCustom = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2003,7 +1938,10 @@ function StakeholderStep({ onContinue }: { onContinue: () => void }) {
     window.setTimeout(() => {
       const newPersona: Persona = {
         id: `custom-${Date.now()}`,
-        ...MOCK_CUSTOM_PERSONA,
+        type: `Your neighbor #${extraPersonas.length + 1}`,
+        adjectives: ["custom"],
+        fear: "Whatever they described in their own words.",
+        description: desc,
         sketch: <SketchCustom />,
       };
       setExtraPersonas((prev) => [...prev, newPersona]);
@@ -2034,48 +1972,81 @@ function StakeholderStep({ onContinue }: { onContinue: () => void }) {
 
 
           <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {allPersonas.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setOpenId(p.id)}
-                style={{
-                  borderColor: p.color ? `${p.color}80` : undefined,
-                }}
-                className="group relative flex flex-col items-start gap-5 overflow-hidden rounded-3xl border-2 bg-card/60 p-6 text-left transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-20px_rgba(0,0,0,0.25)]"
-              >
-                <div
-                  className="grid h-28 w-full place-items-center rounded-2xl"
-                  style={{
-                    backgroundColor: p.color ? `${p.color}1A` : "rgba(0,0,0,0.03)",
-                  }}
-                >
-                  <div className="h-24 w-24 text-foreground/80 transition group-hover:text-foreground">
-                    {p.sketch}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-display text-xl font-semibold tracking-tight text-foreground">
-                    {p.type}
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {p.adjectives.map((a) => (
-                      <span
-                        key={a}
-                        style={{
-                          borderColor: p.color ? `${p.color}66` : undefined,
-                          color: p.color,
-                        }}
-                        className="rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                      >
-                        {a}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </button>
-            ))}
+            {allPersonas.map((p) => {
+              const isSelected = selectedPersonaIds.has(p.id);
+              const isCustomPersona = p.id.startsWith("custom-");
 
+              return (
+                <article
+                  key={p.id}
+                  style={{
+                    borderColor: isSelected ? p.color || "hsl(var(--foreground))" : p.color ? `${p.color}80` : undefined,
+                    backgroundColor: isSelected && p.color ? `${p.color}12` : undefined,
+                  }}
+                  className={[
+                    "group relative flex flex-col items-start gap-5 overflow-hidden rounded-3xl border-2 bg-card/60 p-6 text-left transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-20px_rgba(0,0,0,0.25)]",
+                    isSelected ? "shadow-[0_18px_45px_-28px_rgba(0,0,0,0.45)]" : "",
+                  ].join(" ")}
+                >
+                  <button
+                    type="button"
+                    onClick={() => togglePersona(p.id)}
+                    aria-pressed={isSelected}
+                    aria-label={`${isSelected ? "Deselect" : "Select"} ${p.type}`}
+                    className={[
+                      "absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full border transition",
+                      isSelected
+                        ? "border-transparent bg-foreground text-background"
+                        : "border-border/70 bg-background/70 text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {isSelected ? <Check className="h-4 w-4" /> : null}
+                  </button>
+
+                  <div
+                    className="grid h-28 w-full place-items-center rounded-2xl"
+                    style={{
+                      backgroundColor: p.color ? `${p.color}1A` : "rgba(0,0,0,0.03)",
+                    }}
+                  >
+                    <div className="h-24 w-24 text-foreground/80 transition group-hover:text-foreground">
+                      {p.sketch}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-display text-xl font-semibold tracking-tight text-foreground">
+                      {p.type}
+                    </h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.adjectives.map((a) => (
+                        <span
+                          key={a}
+                          style={{
+                            borderColor: p.color ? `${p.color}66` : undefined,
+                            color: p.color,
+                          }}
+                          className="rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                        >
+                          {a}
+                        </span>
+                      ))}
+                    </div>
+                    {isCustomPersona && (
+                      <p className="line-clamp-4 text-sm leading-relaxed text-foreground/75">
+                        {p.description}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(p.id)}
+                    className="mt-auto rounded-full border border-border/70 bg-background/60 px-3 py-1.5 text-xs font-semibold text-foreground/80 transition hover:border-foreground/25 hover:bg-background"
+                  >
+                    View brief
+                  </button>
+                </article>
+              );
+            })}
           </div>
 
           {/* Custom persona input */}
@@ -2127,6 +2098,11 @@ function StakeholderStep({ onContinue }: { onContinue: () => void }) {
       >
         {persona && (
           <>
+            {(() => {
+              const isCustomPersona = persona.id.startsWith("custom-");
+
+              return (
+                <>
             <div className="flex items-start gap-5">
               <div className="grid h-24 w-24 shrink-0 place-items-center rounded-2xl bg-foreground/[0.05] text-foreground">
                 <div className="h-20 w-20">{persona.sketch}</div>
@@ -2153,16 +2129,21 @@ function StakeholderStep({ onContinue }: { onContinue: () => void }) {
 
             <div className="mt-6 rounded-2xl border border-border/60 bg-background/60 p-4">
               <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                What they're afraid of
+                {isCustomPersona ? "Your description" : "What they're afraid of"}
               </p>
               <p className="mt-1 text-sm font-medium text-foreground">
-                {persona.fear}
+                {isCustomPersona ? persona.description : persona.fear}
               </p>
             </div>
 
-            <p className="mt-5 text-sm leading-relaxed text-foreground/85">
-              {persona.description}
-            </p>
+            {!isCustomPersona && (
+              <p className="mt-5 text-sm leading-relaxed text-foreground/85">
+                {persona.description}
+              </p>
+            )}
+                </>
+              );
+            })()}
           </>
         )}
       </GlassDialog>

@@ -1,6 +1,7 @@
 import {
   CloudRain,
   Droplets,
+  Flame,
   Layers,
   Leaf,
   Recycle,

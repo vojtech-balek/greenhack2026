@@ -179,6 +179,12 @@ function normalizeHouseNumber(value: any): string {
   return match ? match[0] : "";
 }
 
+function normalizeOrientationNumber(value: any): string {
+  const number = normalizeHouseNumber(value);
+  const suffix = cleanPart(String(value || "").replace(number, ""));
+  return number ? `${number}${suffix}` : "";
+}
+
 function pickMunicipality(address: any): string {
   return (
     address.city ||
@@ -216,77 +222,11 @@ function normalizeNominatimResult(result: any) {
   };
 }
 
-function normalizeValidatedRuianResult(validatedAddress: any, candidate: any) {
-  const place = validatedAddress?.place;
-  if (!place?.ruianId) {
-    return null;
-  }
-
-  const street = cleanPart(place.streetName || candidate.street || "");
-  const cp = normalizeHouseNumber(place.cp || candidate.cp);
-  const zip = normalizeZip(place.zip || candidate.zip);
-  const municipalityName = cleanPart(place.municipalityName || candidate.municipalityName || "");
-  const displayParts = [
-    street && cp ? `${street} ${cp}` : cp,
-    municipalityName,
-    zip,
-  ].filter(Boolean);
-
-  return {
-    id: String(place.ruianId),
-    displayName: displayParts.join(", "),
-    municipalityName,
-    street,
-    cp,
-    zip,
-    lat: null,
-    lon: null,
-    ruianId: place.ruianId,
-    source: "ruian",
-  };
-}
-
-async function searchAddressesViaRuian(trimmedQuery: string) {
-  let parsedAddress;
-  try {
-    parsedAddress = parseAddress(trimmedQuery);
-  } catch {
-    return [];
-  }
-
-  const matches = [];
-  const seen = new Set<string>();
-
-  for (const candidate of parsedAddress.candidates) {
-    try {
-      const validatedAddress = await validateAddressCandidate(candidate);
-      const match = normalizeValidatedRuianResult(validatedAddress, candidate);
-      if (match && !seen.has(match.id)) {
-        seen.add(match.id);
-        matches.push(match);
-      }
-    } catch {
-      // Try the next parsed candidate before falling back to Nominatim.
-    }
-  }
-
-  return matches;
-}
-
 export async function searchAddresses(query: string) {
   const trimmedQuery = query.trim();
 
   if (trimmedQuery.length < 3) {
     throw new Error("Zadejte alespoň tři znaky adresy.");
-  }
-
-  const ruianMatches = await searchAddressesViaRuian(trimmedQuery);
-  if (ruianMatches.length > 0) {
-    return {
-      query: trimmedQuery,
-      matches: ruianMatches.slice(0, 5),
-      attribution: "RUIAN",
-    };
   }
 
   const searchUrl = new URL("https://nominatim.openstreetmap.org/search");
@@ -704,6 +644,106 @@ async function getBuildingId(addressId: number): Promise<number> {
   return buildingId;
 }
 
+function distanceMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const earthRadiusMeters = 6371000;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const deltaLat = toRadians(b.lat - a.lat);
+  const deltaLon = toRadians(b.lon - a.lon);
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+  const haversine =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+
+  return 2 * earthRadiusMeters * Math.asin(Math.sqrt(haversine));
+}
+
+function parseRuianAddressText(value: string) {
+  const parts = value.split(",").map(cleanPart).filter(Boolean);
+  const streetMatch = parts[0]?.match(/^(.+?)\s+(\d{1,5})(?:\/(\d+[a-zA-Z]?))?$/u);
+  const municipalityMatch = parts.at(-1)?.match(/^(\d{3}\s?\d{2})\s+(.+)$/u);
+  const municipalityName = municipalityMatch ? cleanPart(municipalityMatch[2]) : cleanPart(parts.at(-1) || "");
+
+  return {
+    streetName: streetMatch ? cleanPart(streetMatch[1]) : "",
+    cp: streetMatch ? streetMatch[2] : "",
+    co: streetMatch?.[3] || "",
+    municipalityPartName: parts.length > 2 ? parts[1] : "",
+    zip: municipalityMatch ? normalizeZip(municipalityMatch[1]) : "",
+    municipalityName: municipalityName.replace(/^Praha\s+\d+$/iu, "Praha"),
+  };
+}
+
+async function findNearestAddressPoint(lat: number, lon: number) {
+  const addressPointUrl = new URL("https://ags.cuzk.cz/arcgis/rest/services/RUIAN/MapServer/1/query");
+  addressPointUrl.searchParams.set("geometry", JSON.stringify({
+    x: lon,
+    y: lat,
+    spatialReference: { wkid: 4326 },
+  }));
+  addressPointUrl.searchParams.set("geometryType", "esriGeometryPoint");
+  addressPointUrl.searchParams.set("inSR", "4326");
+  addressPointUrl.searchParams.set("spatialRel", "esriSpatialRelIntersects");
+  addressPointUrl.searchParams.set("distance", "35");
+  addressPointUrl.searchParams.set("units", "esriSRUnit_Meter");
+  addressPointUrl.searchParams.set(
+    "outFields",
+    "kod,stavebniobjekt,adresa,cislodomovni,cisloorientacni,cisloorientacnipismeno,psc"
+  );
+  addressPointUrl.searchParams.set("returnGeometry", "true");
+  addressPointUrl.searchParams.set("outSR", "4326");
+  addressPointUrl.searchParams.set("f", "json");
+
+  const response = await fetchJson(addressPointUrl);
+  const features = response.features || [];
+  const nearest = features
+    .map((feature: any) => {
+      const featureLat = toFiniteNumber(feature.geometry?.y);
+      const featureLon = toFiniteNumber(feature.geometry?.x);
+
+      if (featureLat === null || featureLon === null) {
+        return null;
+      }
+
+      return {
+        feature,
+        distance: distanceMeters({ lat, lon }, { lat: featureLat, lon: featureLon }),
+      };
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => a.distance - b.distance)[0];
+
+  if (!nearest?.feature?.attributes?.kod) {
+    return null;
+  }
+
+  const attributes = nearest.feature.attributes;
+  const parsed = parseRuianAddressText(attributes.adresa || "");
+  const orientationNumber = [
+    normalizeOrientationNumber(attributes.cisloorientacni),
+    cleanPart(attributes.cisloorientacnipismeno || ""),
+  ].filter(Boolean).join("");
+
+  return {
+    addressId: attributes.kod,
+    buildingId: attributes.stavebniobjekt,
+    distanceMeters: nearest.distance,
+    address: {
+      confidence: 1,
+      municipalityName: parsed.municipalityName,
+      municipalityPartName: parsed.municipalityPartName,
+      streetName: parsed.streetName,
+      zip: normalizeZip(attributes.psc) || parsed.zip,
+      cp: normalizeHouseNumber(attributes.cislodomovni) || parsed.cp,
+      co: orientationNumber || parsed.co,
+      displayName: attributes.adresa || "",
+      ruianId: attributes.kod,
+      lat,
+      lon,
+    },
+  };
+}
+
 async function getBuildingAttributes(buildingId: number) {
   const attributesUrl = new URL("https://ags.cuzk.cz/arcgis/rest/services/RUIAN/MapServer/3/query");
   attributesUrl.searchParams.set("where", `kod=${buildingId}`);
@@ -724,7 +764,7 @@ async function getBuildingAttributes(buildingId: number) {
 export async function getBuildingInfo(addressInput: any) {
   const selectedLat = typeof addressInput === "object" && addressInput !== null ? toFiniteNumber(addressInput.lat) : null;
   const selectedLon = typeof addressInput === "object" && addressInput !== null ? toFiniteNumber(addressInput.lon) : null;
-  
+
   const parsedAddress =
     typeof addressInput === "string"
       ? parseAddress(addressInput)
@@ -743,31 +783,45 @@ export async function getBuildingInfo(addressInput: any) {
           ]),
         };
 
-  const validatedAddress = await getAddressId(parsedAddress);
-  const addressId = validatedAddress.place.ruianId;
-  const buildingId = await getBuildingId(addressId);
+  const addressPoint =
+    selectedLat !== null && selectedLon !== null
+      ? await findNearestAddressPoint(selectedLat, selectedLon).catch(() => null)
+      : null;
+  const validatedAddress = addressPoint ? null : await getAddressId(parsedAddress);
+  const addressId = addressPoint?.addressId || validatedAddress.place.ruianId;
+  const buildingId = addressPoint?.buildingId || await getBuildingId(addressId);
   const attributes = await getBuildingAttributes(buildingId);
   const constructionTypes = await constructionTypesPromise;
   const layer3Domains = await getLayer3Domains();
   const constructionCode = attributes.druhkonstrukcekod;
+  const resolvedAddress = addressPoint?.address;
 
   return {
-    query: parsedAddress.address,
+    query: resolvedAddress?.displayName || parsedAddress.address,
     lookup: {
       addressId,
       buildingId,
-      matchedCandidate: validatedAddress.matchedCandidate,
+      matchedCandidate: addressPoint
+        ? {
+            address: resolvedAddress?.displayName || parsedAddress.address,
+            municipalityName: resolvedAddress?.municipalityName || "",
+            street: resolvedAddress?.streetName || "",
+            zip: resolvedAddress?.zip || "",
+            cp: resolvedAddress?.cp || "",
+            distanceMeters: addressPoint.distanceMeters,
+          }
+        : validatedAddress.matchedCandidate,
     },
     address: {
-      confidence: validatedAddress.place.confidence,
-      municipalityName: validatedAddress.place.municipalityName,
-      municipalityPartName: validatedAddress.place.municipalityPartName,
-      streetName: validatedAddress.place.streetName,
-      zip: validatedAddress.place.zip,
-      cp: validatedAddress.place.cp,
+      confidence: resolvedAddress?.confidence ?? validatedAddress?.place?.confidence,
+      municipalityName: resolvedAddress?.municipalityName ?? validatedAddress?.place?.municipalityName,
+      municipalityPartName: resolvedAddress?.municipalityPartName ?? validatedAddress?.place?.municipalityPartName,
+      streetName: resolvedAddress?.streetName ?? validatedAddress?.place?.streetName,
+      zip: resolvedAddress?.zip ?? validatedAddress?.place?.zip,
+      cp: resolvedAddress?.cp ?? validatedAddress?.place?.cp,
       ruianId: addressId,
-      lat: selectedLat,
-      lon: selectedLon,
+      lat: resolvedAddress?.lat ?? selectedLat,
+      lon: resolvedAddress?.lon ?? selectedLon,
     },
     building: {
       stavebniObjektKod: attributes.kod,
