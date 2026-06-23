@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/calculate-renovation")({
           });
         } catch (error: any) {
           return new Response(
-            JSON.stringify({ error: error.message || "Nepodařilo se spočítat renovaci." }),
+            JSON.stringify({ error: error.message || "Could not calculate the renovation." }),
             {
               status: 400,
               headers: {

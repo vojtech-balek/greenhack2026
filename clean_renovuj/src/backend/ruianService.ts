@@ -216,11 +216,77 @@ function normalizeNominatimResult(result: any) {
   };
 }
 
+function normalizeValidatedRuianResult(validatedAddress: any, candidate: any) {
+  const place = validatedAddress?.place;
+  if (!place?.ruianId) {
+    return null;
+  }
+
+  const street = cleanPart(place.streetName || candidate.street || "");
+  const cp = normalizeHouseNumber(place.cp || candidate.cp);
+  const zip = normalizeZip(place.zip || candidate.zip);
+  const municipalityName = cleanPart(place.municipalityName || candidate.municipalityName || "");
+  const displayParts = [
+    street && cp ? `${street} ${cp}` : cp,
+    municipalityName,
+    zip,
+  ].filter(Boolean);
+
+  return {
+    id: String(place.ruianId),
+    displayName: displayParts.join(", "),
+    municipalityName,
+    street,
+    cp,
+    zip,
+    lat: null,
+    lon: null,
+    ruianId: place.ruianId,
+    source: "ruian",
+  };
+}
+
+async function searchAddressesViaRuian(trimmedQuery: string) {
+  let parsedAddress;
+  try {
+    parsedAddress = parseAddress(trimmedQuery);
+  } catch {
+    return [];
+  }
+
+  const matches = [];
+  const seen = new Set<string>();
+
+  for (const candidate of parsedAddress.candidates) {
+    try {
+      const validatedAddress = await validateAddressCandidate(candidate);
+      const match = normalizeValidatedRuianResult(validatedAddress, candidate);
+      if (match && !seen.has(match.id)) {
+        seen.add(match.id);
+        matches.push(match);
+      }
+    } catch {
+      // Try the next parsed candidate before falling back to Nominatim.
+    }
+  }
+
+  return matches;
+}
+
 export async function searchAddresses(query: string) {
   const trimmedQuery = query.trim();
 
   if (trimmedQuery.length < 3) {
     throw new Error("Zadejte alespoň tři znaky adresy.");
+  }
+
+  const ruianMatches = await searchAddressesViaRuian(trimmedQuery);
+  if (ruianMatches.length > 0) {
+    return {
+      query: trimmedQuery,
+      matches: ruianMatches.slice(0, 5),
+      attribution: "RUIAN",
+    };
   }
 
   const searchUrl = new URL("https://nominatim.openstreetmap.org/search");

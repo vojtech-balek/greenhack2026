@@ -25,7 +25,7 @@ export const Route = createFileRoute("/api/generate-material")({
           );
         } catch (error: any) {
           return new Response(
-            JSON.stringify({ error: error.message || "Nepodařilo se vygenerovat materiál." }),
+            JSON.stringify({ error: error.message || "Could not generate the material." }),
             {
               status: 400,
               headers: {

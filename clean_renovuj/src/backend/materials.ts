@@ -111,7 +111,7 @@ function makeMaterialPrompt(payload: any): string {
 
 ${formatPrompt}
 
-Persona strategie:
+Persona strategy:
 ${
   personaPrompts.length
     ? personaPrompts.map((item: string) => `- ${item}`).join("\n")
@@ -318,7 +318,8 @@ function formatCurrencyPlain(value: any): string {
     maximumFractionDigits: 0,
   })
     .format(number)
-    .replace(/\u00A0/g, " ");
+    .replace(/\u00A0/g, " ")
+    .replace(/K?/g, "CZK");
 }
 
 function escapeHtml(value: any): string {
@@ -365,7 +366,7 @@ function renderOnePagerHtml(onePager: any, payload: any): string {
     .join(" · ");
 
   return `<!doctype html>
-<html lang="cs">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <style>
@@ -465,10 +466,10 @@ function renderLeafletHtml(leaflet: any, payload: any): string {
   const goalsText = goals
     .map((goal: any) => goal.label)
     .filter(Boolean)
-    .join(", ") || "renovace domu";
+    .join(", ") || "building renovation";
 
   return `<!doctype html>
-<html lang="cs">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <style>

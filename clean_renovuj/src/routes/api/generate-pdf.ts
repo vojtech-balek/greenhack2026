@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/generate-pdf")({
           });
         } catch (error: any) {
           return new Response(
-            JSON.stringify({ error: error.message || "Nepodařilo se vygenerovat PDF." }),
+            JSON.stringify({ error: error.message || "Could not generate the PDF." }),
             {
               status: 400,
               headers: {

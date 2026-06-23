@@ -20,7 +20,7 @@ import { ArrowRight, Sparkles, X } from "lucide-react";
 // =====================================================================
 
 const MOCK_AI_REPLY =
-  "Here's a short, friendly take based on what we know about your building. (This is a mock answer wired to the demo flow — real answers will come from the assistant grounded in your audit, NZÚ rules, and neighbour cases.)";
+  "Here's a short, friendly take based on what we know about your building. (This is a mock answer wired to the demo flow — real answers will come from the assistant grounded in your audit, NZU rules, and neighbour cases.)";
 
 const DEFAULT_PLACEHOLDER = "Ask Renovuj AI anything about your renovation…";
 
@@ -77,10 +77,10 @@ export function AskAiProvider({ children }: { children: React.ReactNode }) {
         if (response.ok && data.answer) {
           setAiReply(data.answer);
         } else {
-          setAiReply(data.error || "Nepodařilo se získat odpověď od AI.");
+          setAiReply(data.error || "Could not get an AI response.");
         }
       } catch (err: any) {
-        setAiReply(err.message || "Nepodařilo se připojit k serveru.");
+        setAiReply(err.message || "Could not connect to the server.");
       } finally {
         setThinking(false);
       }

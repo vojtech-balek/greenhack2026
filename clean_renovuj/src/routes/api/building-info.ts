@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/building-info")({
           });
         } catch (error: any) {
           return new Response(
-            JSON.stringify({ error: error.message || "Nepodařilo se načíst údaje o domu." }),
+            JSON.stringify({ error: error.message || "Could not load building details." }),
             {
               status: 400,
               headers: {

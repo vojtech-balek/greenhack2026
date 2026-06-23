@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/address-search")({
           });
         } catch (error: any) {
           return new Response(
-            JSON.stringify({ error: error.message || "Nepodařilo se vyhledat adresu." }),
+            JSON.stringify({ error: error.message || "Could not search for the address." }),
             {
               status: 400,
               headers: {

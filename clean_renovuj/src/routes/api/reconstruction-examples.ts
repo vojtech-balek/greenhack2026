@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/reconstruction-examples")({
           });
         } catch (error: any) {
           return new Response(
-            JSON.stringify({ error: error.message || "Nepodařilo se načíst příklady rekonstrukcí." }),
+            JSON.stringify({ error: error.message || "Could not load reconstruction examples." }),
             {
               status: 400,
               headers: {
